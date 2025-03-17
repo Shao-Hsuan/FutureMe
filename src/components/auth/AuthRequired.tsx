@@ -25,7 +25,7 @@ export default function AuthRequired({ onFirstLogin }: AuthRequiredProps) {
       location.pathname.startsWith(path)
     );
 
-    // 如果沒有目標且不在目標相關頁面，導向到目標設置頁面
+    // 只有當沒有目標且不在目標相關頁面時，才導向到目標設置頁面
     if (goals.length === 0 && !isGoalRelatedPath) {
       console.log('🎯 No goals found, redirecting to goal setup');
       navigate('/goal-setup', { replace: true });
