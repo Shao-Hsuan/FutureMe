@@ -60,13 +60,15 @@ function App() {
             <Route path="/" element={<Navigate to="/journal" replace />} />
             <Route path="/journal" element={<JournalPage />} />
             <Route path="/journal/new" element={<JournalNewPage />} />
-            <Route path="/journal/:id" element={<JournalDetailPage />} />
-            <Route path="/journal/:id/edit" element={<JournalEditPage />} />
             <Route path="/collection" element={<CollectionPage />} />
             <Route path="/future-me" element={<FutureMePage />} />
-            <Route path="/future-me/:id" element={<LetterDetailPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
+          
+          {/* Detail pages (without TabBar) */}
+          <Route path="/journal/:id" element={<JournalDetailPage />} />
+          <Route path="/journal/:id/edit" element={<JournalEditPage />} />
+          <Route path="/future-me/:id" element={<LetterDetailPage />} />
         </Route>
       </Routes>
       <UsageGuideSheet isOpen={showGuide} onClose={handleGuideClose} />
