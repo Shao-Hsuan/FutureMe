@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Goal } from '../types';
-import { getGoals as fetchGoals } from '../services/supabase';
+import { getGoals as fetchGoals, deleteGoal as deleteGoalAPI } from '../services/supabase';
 
 interface GoalState {
   currentGoal: Goal | null;
@@ -13,7 +13,7 @@ interface GoalState {
   setGoals: (goals: Goal[]) => void;
   addGoal: (goal: Goal) => void;
   updateGoal: (goal: Goal) => void;
-  deleteGoal: (id: string | number) => void;
+  deleteGoal: (id: string | number) => Promise<void>;
   loadGoals: () => Promise<void>;
   reset: () => void;
 }
@@ -74,28 +74,57 @@ export const useGoalStore = create<GoalState>()(
           currentGoal: get().currentGoal?.id === goal.id ? goal : get().currentGoal
         });
       },
-      deleteGoal: (id) => {
+      deleteGoal: async (id) => {
         console.log('Deleting goal:', id);
-        // 確保 id 為數字類型
+        // 確保 id 為數字類型用於比較
         const goalId = typeof id === 'string' ? Number(id) : id;
-        const newGoals = get().goals.filter((g) => g.id !== goalId);
-        const { currentGoal } = get();
-        
-        // 如果刪除的是當前目標，切換到第一個可用的目標
-        if (currentGoal?.id === goalId) {
-          const newCurrentGoal = newGoals[0] || null;
-          set({ 
-            goals: newGoals,
-            currentGoal: newCurrentGoal
-          });
-          // 更新最後使用的目標 ID
-          if (newCurrentGoal) {
-            localStorage.setItem('lastUsedGoalId', newCurrentGoal.id.toString());
+
+        try {
+          // 立即從本地狀態中移除目標
+          const newGoals = get().goals.filter((g) => g.id !== goalId);
+          const { currentGoal } = get();
+
+          // 如果刪除的是當前目標，選擇新的目標
+          if (currentGoal?.id === goalId) {
+            const newCurrentGoal = newGoals[0] || null;
+            
+            // 更新本地狀態 (目標列表和當前目標)
+            set({ 
+              goals: newGoals,
+              currentGoal: newCurrentGoal
+            });
+            
+            // 更新 localStorage 中的最後使用目標
+            if (newCurrentGoal) {
+              localStorage.setItem('lastUsedGoalId', newCurrentGoal.id.toString());
+            } else {
+              localStorage.removeItem('lastUsedGoalId');
+            }
           } else {
-            localStorage.removeItem('lastUsedGoalId');
+            // 只更新目標列表
+            set({ goals: newGoals });
           }
-        } else {
-          set({ goals: newGoals });
+
+          // 然後執行資料庫刪除 (使用字串 ID)
+          await deleteGoalAPI(typeof id === 'string' ? id : id.toString());
+
+          // 手動同步 localStorage 中的目標列表，確保持久化儲存同步
+          const currentState = get();
+          const stateToStore = {
+            currentGoal: currentState.currentGoal,
+            goals: currentState.goals
+          };
+          localStorage.setItem('goal-storage', JSON.stringify({
+            state: stateToStore,
+            version: 1
+          }));
+
+          console.log('Goal deleted successfully, storage updated');
+        } catch (error) {
+          console.error('Error deleting goal:', error);
+          // 如果資料庫操作失敗，重新載入目標列表以恢復正確狀態
+          await get().loadGoals();
+          throw error;
         }
       },
       loadGoals: async () => {

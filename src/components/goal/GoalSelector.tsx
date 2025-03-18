@@ -1,11 +1,10 @@
-import { Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useState } from 'react';
 import { useGoalStore } from '../../store/goalStore';
 import type { Goal } from '../../types';
 import NewGoalButton from './NewGoalButton';
 import GoalMenu from './GoalMenu';
 import GoalEditForm from './GoalEditForm';
-import { deleteGoal } from '../../services/supabase';
 
 interface GoalSelectorProps {
   isOpen: boolean;
@@ -13,8 +12,9 @@ interface GoalSelectorProps {
 }
 
 export default function GoalSelector({ isOpen, onClose }: GoalSelectorProps) {
-  const { goals, currentGoal, setCurrentGoal, deleteGoal: removeGoal } = useGoalStore();
+  const { goals, currentGoal, setCurrentGoal, deleteGoal } = useGoalStore();
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+  const [deletingGoals, setDeletingGoals] = useState<Set<number>>(new Set());
 
   if (!isOpen) return null;
 
@@ -25,19 +25,30 @@ export default function GoalSelector({ isOpen, onClose }: GoalSelectorProps) {
 
   const handleGoalDelete = async (goal: Goal) => {
     try {
-      await deleteGoal(goal.id);
-      removeGoal(goal.id);
+      // 標記目標為正在刪除狀態 (僅用於 UI)
+      setDeletingGoals(prev => {
+        const newSet = new Set(prev);
+        newSet.add(goal.id);
+        return newSet;
+      });
       
-      // If deleted goal was current, select another one
-      if (currentGoal?.id === goal.id) {
-        const remainingGoals = goals.filter(g => g.id !== goal.id);
-        setCurrentGoal(remainingGoals[0] || null);
-      }
+      // 呼叫 store 中的刪除方法 (新版實現會處理本地狀態和資料庫操作)
+      await deleteGoal(goal.id);
     } catch (error) {
-      console.error('Failed to delete goal:', error);
+      console.error('刪除目標失敗:', error);
       alert('刪除目標失敗，請稍後再試');
+    } finally {
+      // 無論成功或失敗，都從刪除集合中移除
+      setDeletingGoals(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(goal.id);
+        return newSet;
+      });
     }
   };
+
+  // 過濾出正在刪除中的目標
+  const filteredGoals = goals.filter(goal => !deletingGoals.has(goal.id));
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
@@ -50,7 +61,7 @@ export default function GoalSelector({ isOpen, onClose }: GoalSelectorProps) {
         </div>
         
         <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-          {goals.map((goal) => (
+          {filteredGoals.map((goal) => (
             <div
               key={goal.id}
               className={`w-full p-4 rounded-lg flex items-center space-x-3 border ${
