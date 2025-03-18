@@ -46,7 +46,7 @@ export default function JournalEntry({ entry, onDelete }: JournalEntryProps) {
   const attachmentItems = [
     // 媒體檔案
     ...(entry.media_urls || []).map(url => ({
-      type: isVideo(url) ? 'video' : 'image',
+      type: isVideo(url) ? 'video' as const : 'image' as const,
       url,
       content: url,
       isFromCollect: entry.collect_id !== null
