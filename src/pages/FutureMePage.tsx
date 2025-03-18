@@ -2,31 +2,53 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGoalStore } from '../store/goalStore';
 import { useLetterStore } from '../store/letterStore';
-import { generateLetter } from '../services/letterService';
+import { generateLetter, getTimeUntilNextGeneration } from '../services/letterService';
 import { supabase } from '../services/supabase';
 import GoalHeader from '../components/layout/GoalHeader';
-import { formatDistanceToNow } from 'date-fns';
-import { zhTW } from 'date-fns/locale';
-import { CheckCircle, XCircle, Clock, Trash2, Plus, Sparkles, ArrowRight, History } from 'lucide-react';
+import { Clock, Sparkles, History } from 'lucide-react';
 import type { Letter } from '../types/letter';
 
-function StatusBadge({ status }: { status: string }) {
-  switch (status) {
-    case 'unread':
-      return (
-        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-          未讀
-        </span>
-      );
-    case 'read':
-      return (
-        <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
-          已讀
-        </span>
-      );
-    default:
-      return null;
-  }
+// 倒數計時元件
+function Countdown({ targetTime }: { targetTime: number }) {
+  const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number }>({ hours: 0, minutes: 0 });
+  
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const diff = targetTime - Date.now();
+      if (diff <= 0) {
+        setTimeLeft({ hours: 0, minutes: 0 });
+        return true; // 時間到
+      }
+      
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      setTimeLeft({ hours, minutes });
+      return false; // 還未到時間
+    };
+    
+    // 初始計算
+    const isFinished = calculateTimeLeft();
+    if (isFinished) return;
+    
+    // 每分鐘更新一次
+    const timer = setInterval(() => {
+      const isFinished = calculateTimeLeft();
+      if (isFinished) {
+        clearInterval(timer);
+        window.location.reload(); // 時間到時重新載入頁面
+      }
+    }, 60 * 1000);
+    
+    return () => clearInterval(timer);
+  }, [targetTime]);
+  
+  return (
+    <div className="flex items-center gap-1">
+      <Clock className="w-4 h-4" />
+      <span>{timeLeft.hours} 小時 {timeLeft.minutes} 分鐘</span>
+    </div>
+  );
 }
 
 export default function FutureMePage() {
@@ -35,11 +57,18 @@ export default function FutureMePage() {
   const { currentStatus } = useLetterStore();
   const [letters, setLetters] = useState<Letter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [canGenerate, setCanGenerate] = useState(true);
+  const [timeUntilNextGeneration, setTimeUntilNextGeneration] = useState<number>(0);
 
   useEffect(() => {
+    // 檢查是否可以生成信件
+    const remainingTime = getTimeUntilNextGeneration();
+    setTimeUntilNextGeneration(remainingTime);
+    setCanGenerate(remainingTime <= 0);
+    
     if (currentGoal?.id) {
       loadLetters();
     }
@@ -48,7 +77,7 @@ export default function FutureMePage() {
   const loadLetters = async () => {
     try {
       setIsLoading(true);
-      setError(undefined);
+      setError(null);
 
       const { data, error } = await supabase
         .from('letters')
@@ -67,7 +96,7 @@ export default function FutureMePage() {
   };
 
   const handleGenerateLetter = async () => {
-    if (!currentGoal?.id || isGenerating) return;
+    if (!currentGoal?.id || isGenerating || !canGenerate) return;
 
     try {
       setIsGenerating(true);
@@ -79,6 +108,12 @@ export default function FutureMePage() {
 
       // 更新列表
       setLetters(prev => [letter, ...prev]);
+      
+      // 由於 letterService 中已經處理了更新時間的邏輯
+      // 在這裡我們只需要重新檢查可用時間，讓 UI 反應最新狀態
+      const remainingTime = getTimeUntilNextGeneration();
+      setTimeUntilNextGeneration(remainingTime);
+      setCanGenerate(remainingTime <= 0);
       
       // 導航到信件詳細頁面
       navigate(`/future-me/${letter.id}`);
@@ -128,7 +163,7 @@ export default function FutureMePage() {
     );
   }
 
-  if (error) {
+  if (error !== null) {
     return (
       <div className="min-h-screen bg-gray-50">
         <GoalHeader pageName="未來的我" rightContent={headerRightContent} />
@@ -156,11 +191,21 @@ export default function FutureMePage() {
         {!showHistory && (
           <button
             onClick={handleGenerateLetter}
-            disabled={isGenerating || currentStatus.status === 'generating'}
-            className="w-full bg-white rounded-lg shadow-sm p-4 flex items-center justify-center gap-2 hover:bg-gray-50 disabled:opacity-50"
+            disabled={isGenerating || currentStatus.status === 'generating' || !canGenerate}
+            className="w-full bg-white rounded-lg shadow-sm p-4 flex flex-col items-center justify-center gap-2 hover:bg-gray-50 disabled:opacity-80 disabled:hover:bg-white"
           >
-            <Plus className="w-5 h-5" />
-            <span>生成新的信件</span>
+            {canGenerate ? (
+              <>
+                <Sparkles className="w-6 h-6 text-blue-500" />
+                <span className="text-lg">未來的你寄了一封信給你，要收信嗎？</span>
+              </>
+            ) : (
+              <>
+                <Clock className="w-6 h-6 text-gray-500" />
+                <span className="text-lg">未來的你現在在忙，明天才會寄信給你</span>
+                <Countdown targetTime={Date.now() + timeUntilNextGeneration} />
+              </>
+            )}
           </button>
         )}
 
@@ -199,17 +244,6 @@ export default function FutureMePage() {
                     <h3 className="text-lg font-medium text-gray-900 mb-1">
                       {letter.title}
                     </h3>
-                    <p className="text-sm text-gray-500">
-                      {formatDistanceToNow(new Date(letter.created_at), {
-                        addSuffix: true,
-                        locale: zhTW
-                      })}
-                    </p>
-                    <StatusBadge status={letter.read_at ? 'read' : 'unread'} />
-                  </div>
-                  <div className="mt-4 flex items-center text-blue-500 text-sm">
-                    <span>閱讀信件</span>
-                    <ArrowRight className="w-4 h-4 ml-1" />
                   </div>
                 </div>
               </button>

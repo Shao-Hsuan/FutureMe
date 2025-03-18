@@ -12,23 +12,20 @@ interface GenerateLetterOptions {
 
 export async function generateLetter(options: GenerateLetterOptions) {
   const { goalId, type, isManual = false } = options;
-  const { updateStatus, addToHistory } = useLetterStore.getState();
+  const { updateStatus, addToHistory, updateGenerationTimes } = useLetterStore.getState();
+  const currentStatus = useLetterStore.getState().currentStatus;
 
   try {
     // 1. 獲取用戶 ID
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) throw new Error('請先登入');
 
-    // 2. 檢查是否已經有信件
-    const { data: existingLetter } = await supabase
-      .from('letters')
-      .select('id')
-      .eq('goal_id', goalId)
-      .eq('type', type)
-      .maybeSingle();
-
-    if (existingLetter) {
-      return existingLetter;
+    // 2. 檢查是否在 24 小時冷卻時間內
+    if (currentStatus.nextAvailableAt) {
+      const nextAvailableTime = new Date(currentStatus.nextAvailableAt).getTime();
+      if (Date.now() < nextAvailableTime) {
+        throw new Error('每 24 小時只能生成一次信件');
+      }
     }
 
     // 3. 獲取目標資訊
@@ -113,15 +110,20 @@ export async function generateLetter(options: GenerateLetterOptions) {
 
       if (letterError) throw letterError;
 
-      // 9. 更新排程時間
+      // 9. 更新時間記錄
+      const now = new Date();
+      const nextAvailableAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(); // 24 小時後
+      updateGenerationTimes(now.toISOString(), nextAvailableAt);
+
+      // 更新排程時間
       if (!isManual) {
         const { error: taskError } = await supabase
           .from('scheduled_tasks')
           .upsert({
             goal_id: goalId,
             user_id: user.id,
-            last_letter_at: new Date().toISOString(),
-            next_letter_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 小時後
+            last_letter_at: now.toISOString(),
+            next_letter_at: nextAvailableAt
           });
 
         if (taskError) throw taskError;
@@ -132,7 +134,9 @@ export async function generateLetter(options: GenerateLetterOptions) {
         ...status,
         status: 'success',
         progress: 100,
-        endTime: new Date().toISOString()
+        endTime: new Date().toISOString(),
+        lastGeneratedAt: now.toISOString(),
+        nextAvailableAt: nextAvailableAt
       };
 
       updateStatus(finalStatus);
@@ -169,4 +173,19 @@ export async function markLetterAsRead(id: string) {
     .eq('id', id);
 
   if (error) throw error;
+}
+
+// 獲取距離下次可生成信件的時間（毫秒）
+export function getTimeUntilNextGeneration(): number {
+  const { currentStatus } = useLetterStore.getState();
+  
+  if (!currentStatus.nextAvailableAt) {
+    return 0; // 可以立即生成
+  }
+  
+  const nextTime = new Date(currentStatus.nextAvailableAt).getTime();
+  const now = Date.now();
+  const diff = nextTime - now;
+  
+  return diff > 0 ? diff : 0;
 }
