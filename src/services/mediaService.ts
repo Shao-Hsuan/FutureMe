@@ -159,17 +159,16 @@ async function uploadFile(
     const fileName = `${userId}/${uuidv4()}.${fileExt}`;
 
     // 上傳檔案
-    const { error: uploadError, data } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from(bucket)
       .upload(fileName, fileToUpload, {
         cacheControl: '3600',
         upsert: false,
-        contentType: fileToUpload.type, // 明確設定 content-type
-        onUploadProgress: (progress) => {
-          const percentage = (progress.loaded / progress.total) * 100;
-          onProgress?.(Math.round(percentage));
-        }
+        contentType: fileToUpload.type // 明確設定 content-type
       });
+
+    // 手動回報進度為 100%（完成）
+    onProgress?.(100);
 
     if (uploadError) {
       if (uploadError.message.includes('storage/unauthorized')) {
@@ -254,7 +253,7 @@ export async function openMediaPicker(
 
             return {
               url,
-              type: file.type.startsWith('video/') ? 'video' : 'image',
+              type: file.type.startsWith('video/') ? 'video' : 'image' as ('video' | 'image'),
               file
             };
           })

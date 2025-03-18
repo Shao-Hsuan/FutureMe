@@ -101,7 +101,7 @@ export default function FutureMePage() {
     try {
       setIsGenerating(true);
       const letter = await generateLetter({
-        goalId: currentGoal.id,
+        goalId: String(currentGoal.id),
         type: 'daily_feedback',
         isManual: true
       });
