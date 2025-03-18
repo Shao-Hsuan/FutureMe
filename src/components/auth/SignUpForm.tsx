@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { signUp } from '../../services/auth';
 import { AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface SignUpFormProps {
   setError: (error: string | undefined) => void;
@@ -10,8 +11,9 @@ export default function SignUpForm({ setError }: SignUpFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
   const validateForm = () => {
     if (!email) {
@@ -46,11 +48,15 @@ export default function SignUpForm({ setError }: SignUpFormProps) {
 
     setIsLoading(true);
     try {
-      const { data } = await signUp(email, password);
-      if (!data.session) {
-        throw new Error('註冊失敗，請稍後再試');
-      }
-      // Let AuthForm handle the navigation
+      await signUp(email, password);
+      
+      // 修正: 註冊成功後不需要檢查 session，直接導航到日誌頁面
+      // 註冊成功後重置載入狀態
+      setIsLoading(false);
+      
+      // 直接導航到日誌頁面
+      navigate('/journal', { replace: true });
+      
     } catch (error) {
       if (error instanceof Error) {
         setFormError(error.message);

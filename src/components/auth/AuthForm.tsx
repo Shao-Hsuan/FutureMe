@@ -39,16 +39,19 @@ export default function AuthForm() {
   // Watch for auth status changes
   useEffect(() => {
     if (status === 'AUTHENTICATED' && user) {
-      console.log('Auth status changed to authenticated, redirecting...', { userId: user.id });
-      navigate('/journal', { replace: true });
+      console.log('Auth status changed to authenticated, no longer directly redirecting');
+      // 移除主動導向，讓 AuthRequired 元件處理所有的導向邏輯
+      // navigate('/journal', { replace: true });
     }
   }, [status, user, navigate]);
 
   // Listen for custom auth events
   useEffect(() => {
     const handleSignIn = () => {
-      console.log('Sign in event received, redirecting...');
-      navigate('/journal', { replace: true });
+      console.log('Sign in event received...');
+      // 不直接導向到 journal 頁面，而是讓 AuthRequired 組件處理導向邏輯
+      // 這樣可以確保目標檢查在登入後執行
+      // navigate('/journal', { replace: true });
     };
 
     window.addEventListener('supabase.auth.signin', handleSignIn);

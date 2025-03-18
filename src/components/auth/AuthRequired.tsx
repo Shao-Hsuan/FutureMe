@@ -16,97 +16,108 @@ export default function AuthRequired({ onFirstLogin }: AuthRequiredProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { status, user, setUser, setStatus, setError } = useAuthStore();
-  const { loadGoals, reset: resetGoals, goals } = useGoalStore();
+  const { loadGoals, reset: resetGoals, goals, goalsLoaded } = useGoalStore();
 
-  // 檢查目標並導向適當頁面
+  // 導向流程的函數
   const checkGoalsAndRedirect = () => {
-    // 如果在目標相關頁面，不需要重定向
-    const isGoalRelatedPath = ['/goal-setup', '/welcome'].some(path => 
-      location.pathname.startsWith(path)
-    );
-
-    // 只有當沒有目標且不在目標相關頁面時，才導向到目標設置頁面
+    console.log('檢查目標並重定向，當前目標數量:', goals.length, '當前路徑:', location.pathname, '目標載入狀態:', goalsLoaded);
+    
+    // 檢查目標是否已加載完成
+    if (!goalsLoaded) {
+      console.log('目標尚未載入完成，暫不執行重定向');
+      return false;
+    }
+    
+    const isGoalRelatedPath = location.pathname.includes('goal');
     if (goals.length === 0 && !isGoalRelatedPath) {
-      console.log('🎯 No goals found, redirecting to goal setup');
+      console.log('沒有目標且不在目標相關頁面，導向到目標設置頁面');
       navigate('/goal-setup', { replace: true });
       return true;
     }
     return false;
   };
 
+  const checkAuthStatus = () => {
+    if (status === AuthStatus.AUTHENTICATED && user) {
+      console.log('認證狀態變為已認證，檢查目標狀態');
+      checkGoalsAndRedirect();
+    } else {
+      console.log('等待認證完成...', { status, hasUser: !!user });
+      // 如果認證尚未完成，稍後再試
+      setTimeout(checkAuthStatus, 500);
+    }
+  };
+
   useEffect(() => {
-    let mounted = true;
-    let cleanupFn: (() => void) | undefined;
+    if (status === AuthStatus.INITIALIZING) {
+      let mounted = true;
+      let cleanupFn: (() => void) | undefined;
 
-    const initializeAuth = async () => {
-      if (status === AuthStatus.INITIALIZING) {
-        console.log('🔄 Initializing auth...', {
-          pathname: location.pathname,
-          status,
-          hasUser: !!user
-        });
-
+      const initializeAuth = async () => {
         try {
-          // Check current auth status
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          console.log('🔐 Initializing auth...');
+          const { data: { session }, error } = await supabase.auth.getSession();
           
-          if (sessionError) throw sessionError;
+          if (error) throw error;
           
-          if (mounted) {
-            console.log('📡 Auth session:', {
-              hasSession: !!session,
-              userId: session?.user?.id
-            });
-
-            if (session?.user) {
-              console.log('👤 User authenticated, checking settings...');
-              setUser(session.user);
-
-              try {
-                // 載入目標
-                await loadGoals();
-
-                // 檢查使用者設定
-                const { data: settings, error: settingsError } = await supabase
-                  .from('user_settings')
-                  .select('last_login, has_seen_guide')
-                  .eq('user_id', session.user.id)
-                  .maybeSingle();
-
-                if (settingsError) throw settingsError;
-
-                // 如果沒有設定記錄，建立新記錄
-                if (!settings) {
-                  console.log('🆕 Creating new user settings');
-                  const { error: insertError } = await supabase
-                    .from('user_settings')
-                    .insert({ 
-                      user_id: session.user.id,
-                      last_login: new Date().toISOString(),
-                      has_seen_guide: false
-                    });
-                  
-                  if (insertError) throw insertError;
-                  
-                  // 顯示使用說明
-                  onFirstLogin();
-                } else if (!settings.has_seen_guide) {
-                  // 有設定記錄但未看過指南
-                  console.log('📖 User has not seen guide');
-                  onFirstLogin();
-                }
-
-                // 檢查目標狀態並導向
-                checkGoalsAndRedirect();
-                setStatus(AuthStatus.AUTHENTICATED);
-              } catch (error) {
-                console.error('Failed to initialize user:', error);
-                throw error;
-              }
-            } else {
-              setUser(null);
-              resetGoals();
+          if (!session) {
+            console.log('🔓 No session found, setting status to unauthenticated');
+            if (mounted) {
               setStatus(AuthStatus.UNAUTHENTICATED);
+            }
+            return;
+          }
+          
+          console.log('🔒 Session found, setting user and loading goals...');
+          if (mounted) {
+            setUser(session.user);
+                      
+            // 載入用戶的目標
+            try {
+              await loadGoals();
+              console.log('✅ Goals loaded successfully');
+              
+              // 檢查使用者設定
+              const { data: settings, error: settingsError } = await supabase
+                .from('user_settings')
+                .select('last_login, has_seen_guide')
+                .eq('user_id', session.user.id)
+                .maybeSingle();
+
+              if (settingsError) throw settingsError;
+
+              // 如果沒有設定記錄，建立新記錄
+              if (!settings) {
+                console.log('🆕 Creating new user settings');
+                const { error: insertError } = await supabase
+                  .from('user_settings')
+                  .insert({ 
+                    user_id: session.user.id,
+                    last_login: new Date().toISOString(),
+                    has_seen_guide: false
+                  });
+                
+                if (insertError) throw insertError;
+                
+                // 顯示使用說明
+                onFirstLogin();
+              } else if (!settings.has_seen_guide) {
+                // 有設定記錄但未看過指南
+                console.log('📖 User has not seen guide');
+                onFirstLogin();
+              }
+              
+              // 檢查是否需要根據目標狀態進行導向
+              const redirected = checkGoalsAndRedirect();
+              
+              // 只有在沒有重定向時才設置狀態為已認證
+              if (!redirected && mounted) {
+                console.log('👤 Authentication complete, setting status to authenticated');
+                setStatus(AuthStatus.AUTHENTICATED);
+              }
+            } catch (error) {
+              console.error('Failed to initialize user:', error);
+              throw error;
             }
           }
 
@@ -126,11 +137,14 @@ export default function AuthRequired({ onFirstLogin }: AuthRequiredProps) {
                     setUser(session.user);
                     try {
                       await loadGoals();
-                      checkGoalsAndRedirect();
+                      const redirected = checkGoalsAndRedirect();
+                      if (!redirected) {
+                        setStatus(AuthStatus.AUTHENTICATED);
+                      }
                     } catch (error) {
                       console.error('Failed to load goals after auth change:', error);
+                      setStatus(AuthStatus.AUTHENTICATED);
                     }
-                    setStatus(AuthStatus.AUTHENTICATED);
                   }
                   break;
                 case 'SIGNED_OUT':
@@ -157,23 +171,45 @@ export default function AuthRequired({ onFirstLogin }: AuthRequiredProps) {
             setStatus(AuthStatus.ERROR);
           }
         }
-      }
-    };
+      };
 
-    // 啟動認證流程
-    initializeAuth().then(cleanup => {
-      if (mounted && cleanup) {
-        cleanupFn = cleanup;
-      }
-    });
+      // 啟動認證流程
+      initializeAuth().then(cleanup => {
+        if (mounted && cleanup) {
+          cleanupFn = cleanup;
+        }
+      });
 
-    return () => {
-      mounted = false;
-      if (cleanupFn) {
-        cleanupFn();
-      }
-    };
+      return () => {
+        mounted = false;
+        if (cleanupFn) {
+          cleanupFn();
+        }
+      };
+    }
   }, [status === AuthStatus.INITIALIZING]);
+
+  // 監聽認證狀態變化，在認證成功後檢查目標
+  useEffect(() => {
+    if (status === AuthStatus.AUTHENTICATED && user) {
+      console.log('認證狀態變為已認證，檢查目標狀態');
+      checkGoalsAndRedirect();
+    }
+  }, [status, user, goalsLoaded]);
+
+  // 監聽認證成功事件，觸發導向邏輯
+  useEffect(() => {
+    const handleAuthSuccess = () => {
+      console.log('🔔 Auth success event received, checking goals and redirecting...');
+      checkAuthStatus();
+    };
+    
+    window.addEventListener('auth.success', handleAuthSuccess);
+    
+    return () => {
+      window.removeEventListener('auth.success', handleAuthSuccess);
+    };
+  }, []);
 
   // 如果是登出事件，直接導向到登入頁面
   if (status === AuthStatus.UNAUTHENTICATED && !PUBLIC_ROUTES.includes(location.pathname)) {
@@ -183,7 +219,16 @@ export default function AuthRequired({ onFirstLogin }: AuthRequiredProps) {
 
   // 處理已登入狀態訪問登入頁面
   if (status === AuthStatus.AUTHENTICATED && PUBLIC_ROUTES.includes(location.pathname)) {
-    console.log('👤 User authenticated, redirecting to journal');
+    console.log('👤 User authenticated, checking for goals before redirecting');
+    
+    // 優先檢查目標狀態，如果沒有目標且目標載入完成，導向到目標設置頁面
+    if (goals.length === 0 && goalsLoaded) {
+      console.log('🎯 No goals found, redirecting to goal setup');
+      return <Navigate to="/goal-setup" replace />;
+    }
+    
+    // 有目標時才導向到日誌頁面
+    console.log('👤 User has goals, redirecting to journal');
     return <Navigate to="/journal" replace />;
   }
 

@@ -42,14 +42,16 @@ export async function signUp(email: string, password: string) {
         throw new Error('註冊成功但無法自動登入，請重新登入');
       }
 
-      // Dispatch auth event to trigger status update
+      // 傳遞登入事件，但不指定導向位置，讓 AuthRequired 處理
+      // AuthRequired 會根據用戶是否有目標來決定導向位置
       window.dispatchEvent(new Event('supabase.auth.signin'));
 
       // Return the sign in data
       return signInData;
     }
     
-    // Dispatch auth event to trigger status update
+    // 傳遞登入事件，但不指定導向位置，讓 AuthRequired 處理
+    // AuthRequired 會根據用戶是否有目標來決定導向位置
     window.dispatchEvent(new Event('supabase.auth.signin'));
     
     console.log('✅ Sign up successful:', { userId: data.user?.id });
@@ -95,7 +97,9 @@ export async function signIn(email: string, password: string) {
           throw new Error('登入失敗，請稍後再試');
         }
         
-        // Dispatch auth event to trigger status update
+        // 傳遞登入事件，但不指定導向位置，讓 AuthRequired 處理
+        // AuthRequired 會根據用戶是否有目標來決定導向位置
+        // 如果用戶沒有目標，AuthRequired 會導向到目標創建頁面
         window.dispatchEvent(new Event('supabase.auth.signin'));
         
         console.log('✅ Sign in successful:', { 
@@ -106,7 +110,7 @@ export async function signIn(email: string, password: string) {
         return { data: { session, user: session.user } };
       } catch (error) {
         lastError = error;
-        if (error.name === 'AuthRetryableFetchError') {
+        if (error instanceof Error && error.name === 'AuthRetryableFetchError') {
           retries--;
           if (retries > 0) {
             // Wait for 1 second before retrying
@@ -118,13 +122,22 @@ export async function signIn(email: string, password: string) {
       }
     }
 
-    throw lastError || new Error('登入失敗，請稍後再試');
+    if (lastError instanceof Error) {
+      if (lastError.message === 'AuthRetryableFetchError') {
+        throw new Error('網路連線不穩定，請檢查網路連線後再試');
+      }
+      throw lastError;
+    }
+    throw new Error('登入失敗，請稍後再試');
   } catch (error) {
     console.error('❌ Sign in error:', error);
-    if (error.name === 'AuthRetryableFetchError') {
-      throw new Error('網路連線不穩定，請檢查網路連線後再試');
+    if (error instanceof Error) {
+      if (error.message === 'AuthRetryableFetchError') {
+        throw new Error('網路連線不穩定，請檢查網路連線後再試');
+      }
+      throw error;
     }
-    throw error;
+    throw new Error('登入失敗，請稍後再試');
   }
 }
 

@@ -7,12 +7,13 @@ interface GoalState {
   currentGoal: Goal | null;
   goals: Goal[];
   isLoading: boolean;
+  goalsLoaded: boolean;
   error: Error | null;
   setCurrentGoal: (goal: Goal | null) => void;
   setGoals: (goals: Goal[]) => void;
   addGoal: (goal: Goal) => void;
   updateGoal: (goal: Goal) => void;
-  deleteGoal: (id: string) => void;
+  deleteGoal: (id: string | number) => void;
   loadGoals: () => Promise<void>;
   reset: () => void;
 }
@@ -23,6 +24,7 @@ export const useGoalStore = create<GoalState>()(
       currentGoal: null,
       goals: [],
       isLoading: false,
+      goalsLoaded: false,
       error: null,
       setCurrentGoal: (goal) => {
         console.log('Setting current goal:', goal?.id);
@@ -38,7 +40,9 @@ export const useGoalStore = create<GoalState>()(
           // 從 localStorage 獲取最後使用的目標 ID
           const lastUsedGoalId = localStorage.getItem('lastUsedGoalId');
           if (lastUsedGoalId) {
-            const lastUsedGoal = goals.find(g => g.id === lastUsedGoalId);
+            // 將字串 ID 轉換為數字
+            const goalId = Number(lastUsedGoalId);
+            const lastUsedGoal = goals.find(g => g.id === goalId);
             if (lastUsedGoal) {
               set({ currentGoal: lastUsedGoal });
               return;
@@ -59,8 +63,8 @@ export const useGoalStore = create<GoalState>()(
           goals: newGoals,
           currentGoal: goal // 自動切換到新創建的目標
         });
-        // 保存最後使用的目標 ID
-        localStorage.setItem('lastUsedGoalId', goal.id);
+        // 保存最後使用的目標 ID (轉換為字串)
+        localStorage.setItem('lastUsedGoalId', goal.id.toString());
       },
       updateGoal: (goal) => {
         console.log('Updating goal:', goal.id);
@@ -72,11 +76,13 @@ export const useGoalStore = create<GoalState>()(
       },
       deleteGoal: (id) => {
         console.log('Deleting goal:', id);
-        const newGoals = get().goals.filter((g) => g.id !== id);
+        // 確保 id 為數字類型
+        const goalId = typeof id === 'string' ? Number(id) : id;
+        const newGoals = get().goals.filter((g) => g.id !== goalId);
         const { currentGoal } = get();
         
         // 如果刪除的是當前目標，切換到第一個可用的目標
-        if (currentGoal?.id === id) {
+        if (currentGoal?.id === goalId) {
           const newCurrentGoal = newGoals[0] || null;
           set({ 
             goals: newGoals,
@@ -84,7 +90,7 @@ export const useGoalStore = create<GoalState>()(
           });
           // 更新最後使用的目標 ID
           if (newCurrentGoal) {
-            localStorage.setItem('lastUsedGoalId', newCurrentGoal.id);
+            localStorage.setItem('lastUsedGoalId', newCurrentGoal.id.toString());
           } else {
             localStorage.removeItem('lastUsedGoalId');
           }
@@ -106,12 +112,13 @@ export const useGoalStore = create<GoalState>()(
 
           // 使用 setGoals 來處理目標載入和當前目標的設置
           get().setGoals(goals);
-          set({ isLoading: false });
+          set({ isLoading: false, goalsLoaded: true });
         } catch (error) {
           console.error('Failed to load goals:', error);
           set({ 
             error: error instanceof Error ? error : new Error('載入目標失敗'),
             isLoading: false,
+            goalsLoaded: true,
             goals: [],
             currentGoal: null
           });
@@ -125,6 +132,7 @@ export const useGoalStore = create<GoalState>()(
           currentGoal: null,
           goals: [],
           isLoading: false,
+          goalsLoaded: false,
           error: null
         });
       }
@@ -132,15 +140,16 @@ export const useGoalStore = create<GoalState>()(
     {
       name: 'goal-storage',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({
-        goals: state.goals,
-        currentGoal: state.currentGoal
+      partialize: (state) => ({ 
+        currentGoal: state.currentGoal,
+        // 確保 goals 存在並有 length 屬性
+        goals: state.goals || []
       }),
       version: 1,
       onRehydrateStorage: () => (state) => {
         console.log('Store rehydrated:', {
-          hasGoals: state?.goals?.length > 0,
-          hasCurrentGoal: !!state?.currentGoal
+          hasGoals: state?.goals && state.goals.length > 0,
+          currentGoalId: state?.currentGoal?.id
         });
       }
     }

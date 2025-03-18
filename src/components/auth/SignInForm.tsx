@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { signIn } from '../../services/auth';
 import { AlertCircle } from 'lucide-react';
 
@@ -9,8 +10,9 @@ interface SignInFormProps {
 export default function SignInForm({ setError }: SignInFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string>();
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
   const validateForm = () => {
     if (!email) {
@@ -46,7 +48,13 @@ export default function SignInForm({ setError }: SignInFormProps) {
       if (!data.session) {
         throw new Error('登入失敗，請稍後再試');
       }
-      // Let AuthForm handle the navigation
+      
+      // 登入成功後重置載入狀態
+      setIsLoading(false);
+      
+      // 直接導航到首頁
+      navigate('/journal', { replace: true });
+      
     } catch (error) {
       if (error instanceof Error) {
         setFormError(error.message);
