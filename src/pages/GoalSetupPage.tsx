@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, ArrowRight, Image as ImageIcon } from 'lucide-react';
+import { X } from 'lucide-react';
 import { createGoal } from '../services/supabase';
 import { openMediaPicker } from '../services/mediaService';
 import { useGoalStore } from '../store/goalStore';
@@ -8,33 +8,12 @@ import { generateLetter } from '../services/letterService';
 import { createJournalEntry } from '../services/supabase';
 import Toast from '../components/shared/Toast';
 
-interface GoalSetupStep {
-  title: string;
-  description: string;
-}
-
-const steps: GoalSetupStep[] = [
-  {
-    title: '設定你的目標',
-    description: '這個目標對你來說意味著什麼？請用一句話描述你想要達成的事情。'
-  },
-  {
-    title: '選擇一張圖片',
-    description: '選擇一張能代表你目標的圖片，它可以是你的靈感來源、目標的具體呈現，或是任何能激勵你的畫面。'
-  },
-  {
-    title: '確認你的目標',
-    description: '看起來很棒！這就是你想要追求的目標嗎？'
-  }
-];
-
 export default function GoalSetupPage() {
-  const [currentStep, setCurrentStep] = useState(0);
   const [title, setTitle] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<string | undefined>(undefined);
   const [toast, setToast] = useState<{
     type: 'success' | 'error' | 'loading';
     message: string;
@@ -60,7 +39,7 @@ export default function GoalSetupPage() {
         multiple: false, 
         accept: 'image/*'
       }, (progress) => {
-        setToast({ type: 'loading', message: `上傳中 ${progress}%` });
+        setToast({ type: 'loading', message: `上傳中 ${progress.toString()}%` });
       });
 
       setImageUrl(media.url);
@@ -88,22 +67,35 @@ export default function GoalSetupPage() {
 
       // 創建目標
       const goal = await createGoal({ title, image: imageUrl });
+      console.log('目標創建成功:', goal);
       addGoal(goal);
       
-      // 創建第一篇日誌
-      if (imageUrl) {
-        await createJournalEntry({
+      // 創建第一篇日誌 - 確保這一步一定會執行
+      console.log('為目標創建第一篇日誌:', goal.id);
+      try {
+        // 確保媒體網址是空數組而不是null或undefined
+        const mediaUrls = imageUrl ? [imageUrl] : [];
+        console.log('日誌的媒體URL:', mediaUrls);
+        
+        const journalData = {
           title: '一切，都從這個了不起的時刻開始。',
           content: '',
-          media_urls: [imageUrl],
-          goal_id: goal.id
-        });
+          media_urls: mediaUrls,
+          goal_id: String(goal.id)
+        };
+        console.log('準備創建日誌，數據:', journalData);
+        
+        const journalEntry = await createJournalEntry(journalData);
+        console.log('第一篇日誌創建成功:', journalEntry);
+      } catch (journalError) {
+        console.error('創建第一篇日誌失敗:', journalError);
+        // 這裡不拋出錯誤，讓流程繼續，但記錄詳細的錯誤信息
       }
 
       // 生成第一封信
       try {
         await generateLetter({
-          goalId: goal.id,
+          goalId: String(goal.id),
           type: 'goal_created',
           isManual: true
         });

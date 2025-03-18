@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Edit3, Sparkles } from 'lucide-react';
+import { ArrowRight, Edit3 } from 'lucide-react';
 import { generateLetter } from '../services/letterService';
 import { useGoalStore } from '../store/goalStore';
 import { supabase } from '../services/supabase';
@@ -41,7 +41,7 @@ export default function WelcomePage() {
 
       // 如果沒有信件，生成新的
       const letter = await generateLetter({
-        goalId: currentGoal!.id,
+        goalId: String(currentGoal!.id),
         type: 'goal_created',
         isManual: true
       });
@@ -145,7 +145,11 @@ export default function WelcomePage() {
             <span>寫下我的想法</span>
           </button>
           <button
-            onClick={() => navigate('/journal')}
+            onClick={() => {
+              console.log('先逛逛按鈕點擊: 導航到日誌頁面');
+              // 加入時間戳確保每次都是新的URL, 強制日誌頁面刷新
+              navigate(`/journal?refresh=${Date.now()}`, { replace: true });
+            }}
             className="w-full bg-white text-blue-500 rounded-xl py-4 flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
           >
             <span>先逛逛</span>

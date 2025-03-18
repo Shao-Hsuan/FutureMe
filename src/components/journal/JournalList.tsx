@@ -3,13 +3,20 @@ import type { JournalEntry as JournalEntryType } from '../../types/journal';
 import { getJournalEntries } from '../../services/supabase';
 import JournalEntryComponent from './JournalEntry';
 import { useGoalStore } from '../../store/goalStore';
+import { useLocation } from 'react-router-dom';
 
-export default function JournalList() {
+interface JournalListProps {
+  refreshKey?: number;
+}
+
+export default function JournalList({ refreshKey }: JournalListProps = {}) {
   const [entries, setEntries] = useState<JournalEntryType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>();
   const { currentGoal, goals } = useGoalStore();
+  const location = useLocation();
 
+  // 在組件掛載時和當前目標改變時加載日誌
   useEffect(() => {
     if (!currentGoal?.id) {
       setEntries([]);
@@ -17,21 +24,22 @@ export default function JournalList() {
       return;
     }
 
+    console.log('JournalList: currentGoal changed or location changed, reloading entries');
     loadEntries();
-  }, [currentGoal?.id]);
+  }, [currentGoal?.id, location.pathname, location.search, refreshKey]);
 
   async function loadEntries() {
     try {
       setIsLoading(true);
       setError(undefined);
-      console.log('Loading journal entries for goal:', currentGoal!.id);
+      console.log('正在加載目標的日誌:', currentGoal!.id);
       
       const data = await getJournalEntries(String(currentGoal!.id));
-      console.log('Journal entries loaded:', data?.length || 0);
+      console.log('已載入日誌數量:', data?.length || 0, '日誌數據:', data);
       
       setEntries(data || []);
     } catch (err) {
-      console.error('Failed to load journal entries:', err);
+      console.error('載入日誌失敗:', err);
       setError(err instanceof Error ? err.message : '載入日誌失敗');
     } finally {
       setIsLoading(false);

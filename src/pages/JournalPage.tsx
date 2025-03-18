@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import JournalHeader from '../components/journal/JournalHeader';
 import JournalList from '../components/journal/JournalList';
 import JournalFab from '../components/journal/JournalFab';
@@ -10,8 +10,7 @@ export default function JournalPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [promptKey, setPromptKey] = useState(0);
   const location = useLocation();
-  const navigate = useNavigate();
-  const { goals } = useGoalStore();
+  const { goals, currentGoal } = useGoalStore();
 
   // 移除自動跳轉到 goal-setup 的邏輯
   /*
@@ -22,12 +21,23 @@ export default function JournalPage() {
   }, [goals, navigate]);
   */
 
-  // Refresh prompt when navigating back to journal page
+  // 每次頁面加載或從其他頁面返回時刷新
   useEffect(() => {
+    console.log('JournalPage: 頁面加載或路徑變更，刷新日誌列表');
+    setRefreshKey(prev => prev + 1);
     setPromptKey(prev => prev + 1);
   }, [location.pathname]);
 
+  // 當目標變更時也刷新
+  useEffect(() => {
+    if (currentGoal) {
+      console.log('JournalPage: 當前目標變更，刷新日誌列表', currentGoal.id);
+      setRefreshKey(prev => prev + 1);
+    }
+  }, [currentGoal?.id]);
+
   const handleJournalSaved = () => {
+    console.log('JournalPage: 日誌保存後手動刷新');
     setRefreshKey(prev => prev + 1);
   };
 
@@ -40,7 +50,7 @@ export default function JournalPage() {
         </div>
       )}
       <div key={`list-${refreshKey}`}>
-        <JournalList />
+        <JournalList refreshKey={refreshKey} />
       </div>
       <JournalFab onSave={handleJournalSaved} />
     </div>
