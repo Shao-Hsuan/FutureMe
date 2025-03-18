@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Goal } from '../types';
 import type { JournalEntry } from '../types/journal';
+import { generateLetter } from './letterService';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -219,6 +220,32 @@ export async function createJournalEntry(data: {
     .single();
 
   if (error) throw error;
+  
+  // 檢查是否需要觸發 weekly_review
+  try {
+    // 獲取當前目標的日誌總數
+    const { count, error: countError } = await supabase
+      .from('journal_entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('goal_id', data.goal_id)
+      .eq('user_id', session.user.id);
+    
+    if (!countError && count && count % 4 === 0) {
+      console.log(`第 ${count} 篇日誌，觸發 weekly_review`);
+      // 觸發 weekly_review 信件生成
+      generateLetter({
+        goalId: data.goal_id,
+        type: 'weekly_review',
+        isManual: false
+      }).catch(err => {
+        console.error('自動生成 weekly_review 失敗:', err);
+      });
+    }
+  } catch (reviewError) {
+    // 如果生成回顧信失敗，不影響日誌保存
+    console.error('檢查或生成 weekly_review 時出錯:', reviewError);
+  }
+  
   return entry;
 }
 
