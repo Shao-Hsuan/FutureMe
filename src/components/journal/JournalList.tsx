@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { JournalEntry } from '../../types/journal';
+import type { JournalEntry as JournalEntryType } from '../../types/journal';
 import { getJournalEntries } from '../../services/supabase';
-import JournalEntry from './JournalEntry';
+import JournalEntryComponent from './JournalEntry';
 import { useGoalStore } from '../../store/goalStore';
 
 export default function JournalList() {
-  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [entries, setEntries] = useState<JournalEntryType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>();
   const { currentGoal, goals } = useGoalStore();
@@ -26,7 +26,7 @@ export default function JournalList() {
       setError(undefined);
       console.log('Loading journal entries for goal:', currentGoal!.id);
       
-      const data = await getJournalEntries(currentGoal!.id);
+      const data = await getJournalEntries(String(currentGoal!.id));
       console.log('Journal entries loaded:', data?.length || 0);
       
       setEntries(data || []);
@@ -38,7 +38,10 @@ export default function JournalList() {
     }
   }
 
-  const handleDelete = () => {
+  const handleDelete = (entryId: string | number) => {
+    // 直接在本地狀態中移除被刪除的項目
+    setEntries((prevEntries) => prevEntries.filter((entry) => entry.id !== entryId));
+    // 仍然在背景重新加載以保持資料同步
     loadEntries();
   };
 
@@ -93,10 +96,10 @@ export default function JournalList() {
   return (
     <div className="max-w-screen-sm mx-auto space-y-6 px-4 pb-24 pt-4">
       {entries.map((entry) => (
-        <JournalEntry 
+        <JournalEntryComponent 
           key={entry.id} 
           entry={entry}
-          onDelete={handleDelete}
+          onDelete={() => handleDelete(entry.id)}
         />
       ))}
     </div>
