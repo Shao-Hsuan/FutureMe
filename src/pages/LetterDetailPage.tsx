@@ -105,11 +105,14 @@ export default function LetterDetailPage() {
       <div className="max-w-screen-sm mx-auto p-4">
         {/* Letter content */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <img
-            src={letter.front_image}
-            alt={letter.title}
-            className="w-full aspect-[4/3] object-cover"
-          />
+          <div className="flex justify-center my-4">
+            <img
+              src={letter.front_image}
+              alt={letter.title}
+              className="max-w-full object-contain bg-gray-100 border-[14px] border-white rounded-lg shadow-lg transform rotate-[-2deg] hover:rotate-0 transition-transform duration-300"
+              style={{ maxHeight: '300px' }}
+            />
+          </div>
           <div className="p-6 space-y-4">
             <h1 className="text-2xl font-bold">{letter.title}</h1>
             <p className="text-lg text-blue-600">{letter.greeting}</p>
