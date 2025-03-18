@@ -12,17 +12,17 @@ interface GenerateLetterOptions {
 
 export async function generateLetter(options: GenerateLetterOptions) {
   const { goalId, type, isManual = false } = options;
-  const { updateStatus, addToHistory, updateGenerationTimes } = useLetterStore.getState();
-  const currentStatus = useLetterStore.getState().currentStatus;
-
+  const { updateStatus, addToHistory, updateGenerationTimes, getGenerationTimesForGoal } = useLetterStore.getState();
+  
   try {
     // 1. 獲取用戶 ID
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) throw new Error('請先登入');
 
-    // 2. 檢查是否在 24 小時冷卻時間內
-    if (currentStatus.nextAvailableAt) {
-      const nextAvailableTime = new Date(currentStatus.nextAvailableAt).getTime();
+    // 2. 檢查該目標是否在 24 小時冷卻時間內
+    const goalTimes = getGenerationTimesForGoal(goalId);
+    if (goalTimes.nextAvailableAt && goalTimes.lastGeneratedAt) {
+      const nextAvailableTime = new Date(goalTimes.nextAvailableAt).getTime();
       if (Date.now() < nextAvailableTime) {
         throw new Error('每 24 小時只能接收來自未來的信一次');
       }
@@ -64,6 +64,7 @@ export async function generateLetter(options: GenerateLetterOptions) {
       status: 'generating',
       progress: 10,
       startTime: new Date().toISOString(),
+      goalId,
       type,
       metadata: {
         goalId,
@@ -79,27 +80,37 @@ export async function generateLetter(options: GenerateLetterOptions) {
       updateStatus({ ...status, progress: 30 });
       const letterContent = await generateLetterContent({
         type,
-        goal,
+        goal: {
+          title: goal.title
+        },
         journals,
         collects
       });
 
-      // 7. 生成圖片
-      updateStatus({ ...status, progress: 50 });
-      const imagePrompt = getImagePromptForLetter(type, goal);
-      const frontImage = await generateImage({ prompt: imagePrompt });
+      updateStatus({ ...status, progress: 60 });
 
-      // 8. 建立信件
+      // 7. 生成封面
+      const imagePrompt = getImagePromptForLetter(type, { 
+        title: goal.title 
+      });
+
       updateStatus({ ...status, progress: 80 });
+      const imageUrl = await generateImage({ prompt: imagePrompt });
+
+      // 根據資料庫結構建立正確的物件
       const letter = {
-        type,
-        ...letterContent,
-        front_image: frontImage,
         goal_id: goalId,
         user_id: user.id,
-        related_journals: journals,
-        related_collects: collects
+        type,
+        title: letterContent.title,
+        content: letterContent.content,
+        greeting: letterContent.greeting || '',
+        reflection_question: letterContent.reflection_question || '',
+        signature: letterContent.signature || '',
+        front_image: imageUrl
       };
+
+      console.log('準備插入信件數據:', JSON.stringify(letter));
 
       const { data: newLetter, error: letterError } = await supabase
         .from('letters')
@@ -109,10 +120,10 @@ export async function generateLetter(options: GenerateLetterOptions) {
 
       if (letterError) throw letterError;
 
-      // 9. 更新時間記錄
+      // 9. 更新時間記錄 - 按目標ID儲存
       const now = new Date();
       const nextAvailableAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(); // 24 小時後
-      updateGenerationTimes(now.toISOString(), nextAvailableAt);
+      updateGenerationTimes(goalId, now.toISOString(), nextAvailableAt);
 
       // 更新排程時間
       if (!isManual) {
@@ -155,6 +166,7 @@ export async function generateLetter(options: GenerateLetterOptions) {
       error: error instanceof Error ? error.message : '接收來自未來的信失敗',
       startTime: new Date().toISOString(),
       endTime: new Date().toISOString(),
+      goalId,
       type
     };
 
@@ -174,13 +186,22 @@ export async function markLetterAsRead(id: string) {
   if (error) throw error;
 }
 
-// 獲取距離下次可接收來自未來的信的時間（毫秒）
-export function getTimeUntilNextGeneration(): number {
-  const { currentStatus } = useLetterStore.getState();
+// 獲取距離下次可接收指定目標的來自未來的信的時間（毫秒）
+export function getTimeUntilNextGeneration(goalId?: string | number | null): number {
+  const { getGenerationTimesForGoal } = useLetterStore.getState();
   
-  if (!currentStatus.nextAvailableAt) return 0;
+  if (!goalId) return 0;
   
-  const nextTime = new Date(currentStatus.nextAvailableAt).getTime();
+  // 確保 goalId 轉換為字串，因為 store 中用字串作為鍵值
+  const goalIdString = goalId.toString();
+  const goalTimes = getGenerationTimesForGoal(goalIdString);
+  
+  // 檢查是否有 lastGeneratedAt，如果沒有，表示尚未成功接收過來自未來的信
+  if (!goalTimes.lastGeneratedAt || !goalTimes.nextAvailableAt) {
+    return 0; // 尚未有成功記錄，可以立即生成
+  }
+  
+  const nextTime = new Date(goalTimes.nextAvailableAt).getTime();
   const now = Date.now();
   
   return Math.max(0, nextTime - now);

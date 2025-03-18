@@ -64,12 +64,12 @@ export default function FutureMePage() {
   const [timeUntilNextGeneration, setTimeUntilNextGeneration] = useState<number>(0);
 
   useEffect(() => {
-    // 檢查是否可以生成信件
-    const remainingTime = getTimeUntilNextGeneration();
-    setTimeUntilNextGeneration(remainingTime);
-    setCanGenerate(remainingTime <= 0);
-    
+    // 檢查是否可以接收來自未來的信
+    // 只有在有成功記錄（lastGeneratedAt 有值）時才會有等待時間
     if (currentGoal?.id) {
+      const remainingTime = getTimeUntilNextGeneration(currentGoal.id);
+      setTimeUntilNextGeneration(remainingTime);
+      setCanGenerate(remainingTime <= 0);
       loadLetters();
     }
   }, [currentGoal?.id]);
@@ -109,9 +109,8 @@ export default function FutureMePage() {
       // 更新列表
       setLetters(prev => [letter, ...prev]);
       
-      // 由於 letterService 中已經處理了更新時間的邏輯
-      // 在這裡我們只需要重新檢查可用時間，讓 UI 反應最新狀態
-      const remainingTime = getTimeUntilNextGeneration();
+      // 成功接收來自未來的信後，更新時間和狀態
+      const remainingTime = getTimeUntilNextGeneration(currentGoal.id);
       setTimeUntilNextGeneration(remainingTime);
       setCanGenerate(remainingTime <= 0);
       
@@ -119,7 +118,7 @@ export default function FutureMePage() {
       navigate(`/future-me/${letter.id}`);
     } catch (error) {
       console.error('Failed to generate letter:', error);
-      alert(error instanceof Error ? error.message : '生成失敗');
+      alert(error instanceof Error ? error.message : '接收信件失敗');
     } finally {
       setIsGenerating(false);
     }
