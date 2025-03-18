@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Drive 連結轉換工具</title>
+    <style>
+        body {
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            resize: vertical;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .result {
+            margin-top: 20px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+        .result pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background-color: #f1f1f1;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        .success {
+            color: #27ae60;
+        }
+        .error {
+            color: #e74c3c;
+        }
+        .tab-container {
+            margin-top: 20px;
+        }
+        .tab-buttons {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab-button {
+            padding: 10px 15px;
+            background: #f1f1f1;
+            border: none;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+        .tab-button.active {
+            background: #3498db;
+            color: white;
+        }
+        .tab-content {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-top: none;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Google Drive 連結轉換工具</h1>
+    <p>這個工具可以將 Google Drive 分享連結轉換為直接圖片連結，用於網頁中直接顯示圖片。</p>
+    
+    <div class="tab-container">
+        <div class="tab-buttons">
+            <button class="tab-button active" onclick="showTab('tab1')">目標創建 (goal_created)</button>
+            <button class="tab-button" onclick="showTab('tab2')">每日回饋 (daily_feedback)</button>
+            <button class="tab-button" onclick="showTab('tab3')">每週回顧 (weekly_review)</button>
+        </div>
+        
+        <div id="tab1" class="tab-content">
+            <h2>目標創建圖片 (goal_created)</h2>
+            <p>請在下方貼入 Google Drive 分享連結，每行一個：</p>
+            <textarea id="goalCreatedLinks" placeholder="https://drive.google.com/file/d/YOUR_FILE_ID/view?usp=sharing"></textarea>
+            <button onclick="convertLinks('goalCreatedLinks')">轉換連結</button>
+            <div class="result" id="goalCreatedResult"></div>
+        </div>
+        
+        <div id="tab2" class="tab-content hidden">
+            <h2>每日回饋圖片 (daily_feedback)</h2>
+            <p>請在下方貼入 Google Drive 分享連結，每行一個：</p>
+            <textarea id="dailyFeedbackLinks" placeholder="https://drive.google.com/file/d/YOUR_FILE_ID/view?usp=sharing"></textarea>
+            <button onclick="convertLinks('dailyFeedbackLinks')">轉換連結</button>
+            <div class="result" id="dailyFeedbackResult"></div>
+        </div>
+        
+        <div id="tab3" class="tab-content hidden">
+            <h2>每週回顧圖片 (weekly_review)</h2>
+            <p>請在下方貼入 Google Drive 分享連結，每行一個：</p>
+            <textarea id="weeklyReviewLinks" placeholder="https://drive.google.com/file/d/YOUR_FILE_ID/view?usp=sharing"></textarea>
+            <button onclick="convertLinks('weeklyReviewLinks')">轉換連結</button>
+            <div class="result" id="weeklyReviewResult"></div>
+        </div>
+    </div>
+    
+    <h2 style="margin-top: 30px;">所有轉換結果</h2>
+    <button onclick="generateFinalCode()">生成最終代碼</button>
+    <div class="result" id="finalResult"></div>
+    
+    <script>
+        // 從 Google Drive 分享連結中提取 ID
+        function extractDriveFileId(shareLink) {
+            // 標準的分享連結格式: https://drive.google.com/file/d/FILE_ID/view...
+            const standardPattern = /https:\/\/drive\.google\.com\/file\/d\/([\w-]+)\/?/;
+            
+            // 已開啟權限的預覽連結格式: https://drive.google.com/open?id=FILE_ID
+            const openPattern = /https:\/\/drive\.google\.com\/open\?id=([\w-]+)/;
+            
+            // 新版UI的連結格式: https://drive.google.com/drive/*/FILE_ID
+            const newPattern = /https:\/\/drive\.google\.com\/drive\/\w+\/([\w-]+)/;
+
+            let match = shareLink.match(standardPattern);
+            if (match && match[1]) return match[1];
+            
+            match = shareLink.match(openPattern);
+            if (match && match[1]) return match[1];
+            
+            match = shareLink.match(newPattern);
+            if (match && match[1]) return match[1];
+            
+            // 如果是直接提供的ID
+            if (/^[\w-]{25,}$/.test(shareLink.trim())) {
+                return shareLink.trim();
+            }
+            
+            return null;
+        }
+
+        // 將 ID 轉換為直接圖片連結
+        function convertToDriveDirectLink(fileId) {
+            return `https://drive.google.com/uc?export=view&id=${fileId}`;
+        }
+
+        // 一步到位轉換連結
+        function convertDriveShareLinkToDirectLink(shareLink) {
+            const fileId = extractDriveFileId(shareLink);
+            if (!fileId) {
+                throw new Error(`無法從連結中提取檔案ID: ${shareLink}`);
+            }
+            return convertToDriveDirectLink(fileId);
+        }
+
+        // 存儲轉換結果
+        const allResults = {
+            goalCreated: [],
+            dailyFeedback: [],
+            weeklyReview: []
+        };
+
+        // 批量轉換多個連結
+        function convertLinks(textareaId) {
+            const textarea = document.getElementById(textareaId);
+            const resultDiv = document.getElementById(textareaId.replace('Links', 'Result'));
+            const shareLinks = textarea.value.split('\n').filter(link => link.trim() !== '');
+            
+            if (shareLinks.length === 0) {
+                resultDiv.innerHTML = '<p class="error">請輸入至少一個連結</p>';
+                return;
+            }
+            
+            const directLinks = [];
+            const failedLinks = [];
+            
+            for (const link of shareLinks) {
+                try {
+                    const trimmedLink = link.trim();
+                    if (trimmedLink) {
+                        const directLink = convertDriveShareLinkToDirectLink(trimmedLink);
+                        directLinks.push(directLink);
+                    }
+                } catch (error) {
+                    failedLinks.push({
+                        original: link,
+                        error: error.message
+                    });
+                }
+            }
+            
+            // 更新對應的結果集
+            if (textareaId === 'goalCreatedLinks') {
+                allResults.goalCreated = directLinks;
+            } else if (textareaId === 'dailyFeedbackLinks') {
+                allResults.dailyFeedback = directLinks;
+            } else if (textareaId === 'weeklyReviewLinks') {
+                allResults.weeklyReview = directLinks;
+            }
+            
+            // 顯示結果
+            let resultHTML = '';
+            
+            if (directLinks.length > 0) {
+                resultHTML += `<p class="success">成功轉換 ${directLinks.length} 個連結：</p>`;
+                resultHTML += '<pre>' + directLinks.join(',\n') + '</pre>';
+            }
+            
+            if (failedLinks.length > 0) {
+                resultHTML += `<p class="error">有 ${failedLinks.length} 個連結轉換失敗：</p>`;
+                resultHTML += '<ul>';
+                for (const failed of failedLinks) {
+                    resultHTML += `<li>${failed.original}: ${failed.error}</li>`;
+                }
+                resultHTML += '</ul>';
+            }
+            
+            resultDiv.innerHTML = resultHTML;
+        }
+
+        // 生成最終代碼
+        function generateFinalCode() {
+            const finalResultDiv = document.getElementById('finalResult');
+            
+            const tsCode = `// 這個檔案由 Google Drive 連結轉換工具生成
+// 最後生成時間: ${new Date().toLocaleString('zh-TW')}
+
+export const letterImages = {
+  goal_created: [
+    ${allResults.goalCreated.map(link => `'${link}'`).join(',\n    ')}
+  ],
+  
+  daily_feedback: [
+    ${allResults.dailyFeedback.map(link => `'${link}'`).join(',\n    ')}
+  ],
+  
+  weekly_review: [
+    ${allResults.weeklyReview.map(link => `'${link}'`).join(',\n    ')}
+  ]
+};
+
+// 預設備用圖片 URL，當沒有可用圖片時使用
+export const fallbackImageUrls = {
+  goal_created: '${allResults.goalCreated[0] || 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=1200'}', // 新開始主題
+  daily_feedback: '${allResults.dailyFeedback[0] || 'https://images.unsplash.com/photo-1507925921958-8a62f3d1a50d?w=1200'}', // 進步主題
+  weekly_review: '${allResults.weeklyReview[0] || 'https://images.unsplash.com/photo-1493612276216-ee3925520721?w=1200'}', // 成就主題
+};`;
+            
+            finalResultDiv.innerHTML = `
+                <p>請將以下代碼複製到 <code>/Users/833f/FutureMe/src/utils/letterImages.ts</code> 檔案中：</p>
+                <pre>${tsCode}</pre>
+            `;
+        }
+
+        // 標籤切換功能
+        function showTab(tabId) {
+            const tabs = document.querySelectorAll('.tab-content');
+            const buttons = document.querySelectorAll('.tab-button');
+            
+            // 隱藏所有標籤內容
+            tabs.forEach(tab => tab.classList.add('hidden'));
+            
+            // 移除所有按鈕的 active 類
+            buttons.forEach(button => button.classList.remove('active'));
+            
+            // 顯示選中的標籤內容
+            document.getElementById(tabId).classList.remove('hidden');
+            
+            // 設置按鈕為 active
+            const activeButton = Array.from(buttons).find(button => 
+                button.getAttribute('onclick').includes(tabId));
+            if (activeButton) {
+                activeButton.classList.add('active');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,82 +1,115 @@
-import OpenAI from 'openai';
 import { supabase } from './supabase';
+import { letterImages, fallbackImageUrls } from '../utils/letterImages';
 
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true
-});
-
-// 根據信件類型生成提示詞
-export function getImagePromptForLetter(type: string, goal: { title: string }) {
-  const goalTitle = goal.title;
-  
-  switch (type) {
-    case 'goal_created':
-      return `Create a Pixar-style 3D illustration that represents the beginning of a journey towards ${goalTitle}. The image should be uplifting and hopeful, focusing on objects and environments that symbolize this goal, without any human characters. Use warm, optimistic colors and lighting to create a positive atmosphere.`;
-    case 'daily_feedback':
-      return `Create a Pixar-style 3D illustration that represents progress and growth in ${goalTitle}. The image should be encouraging and motivational, focusing on objects and environments that show forward movement or improvement, without any human characters. Use bright, energetic colors to create an inspiring atmosphere.`;
-    case 'weekly_review':
-      return `Create a Pixar-style 3D illustration that celebrates achievements and milestones in ${goalTitle}. The image should be celebratory and uplifting, focusing on objects and environments that symbolize success and growth, without any human characters. Use vibrant, joyful colors to create a triumphant atmosphere.`;
-    default:
-      return `Create a Pixar-style 3D illustration related to ${goalTitle}. The image should be inspiring and positive, focusing on objects and environments that represent this goal, without any human characters. Use warm, encouraging colors to create an uplifting atmosphere.`;
-  }
+// 紀錄每個用戶已使用過的圖片
+interface UsedImagesRecord {
+  [userId: string]: {
+    [imageType: string]: string[]; // 儲存每種類型已使用過的圖片 URL
+  };
 }
 
-// 使用 Edge Function 儲存圖片
-async function saveImage(url: string): Promise<string> {
+// 暫存已使用圖片的記錄（在實際應用中，可考慮將這些資訊存儲到資料庫）
+let usedImagesRecord: UsedImagesRecord = {};
+
+// 根據信件類型獲取圖片提示詞（保留此函數以維持原有 API 兼容性）
+export function getImagePromptForLetter(type: string, _goal: { title: string }) {
+  // 此函數現在僅用於維持兼容性，實際不生成提示詞，只用於判斷信件類型
+  return type;
+}
+
+// 選擇未使用過的圖片
+async function selectNonRepeatingImage(type: string, userId: string): Promise<string> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error('未登入');
-
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/save-image`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ url })
-    });
-
-    if (!response.ok) {
-      throw new Error('儲存圖片失敗');
+    // 初始化用戶的使用記錄（如果不存在）
+    if (!usedImagesRecord[userId]) {
+      usedImagesRecord[userId] = {};
     }
-
-    const { url: permanentUrl } = await response.json();
-    return permanentUrl;
+    if (!usedImagesRecord[userId][type]) {
+      usedImagesRecord[userId][type] = [];
+    }
+    
+    // 獲取該類型的所有可用圖片
+    const allImages = letterImages[type as keyof typeof letterImages] || [];
+    if (allImages.length === 0) {
+      throw new Error('沒有可用圖片');
+    }
+    
+    // 過濾出未使用過的圖片
+    const usedImages = usedImagesRecord[userId][type];
+    let availableImages = allImages.filter(img => !usedImages.includes(img));
+    
+    // 如果所有圖片都已使用過，則重置使用記錄
+    if (availableImages.length === 0) {
+      console.log('所有圖片都已使用過，重置使用記錄');
+      usedImagesRecord[userId][type] = [];
+      availableImages = allImages;
+    }
+    
+    // 隨機選擇一張圖片
+    const randomIndex = Math.floor(Math.random() * availableImages.length);
+    const selectedImage = availableImages[randomIndex];
+    
+    // 記錄已使用的圖片
+    usedImagesRecord[userId][type].push(selectedImage);
+    
+    // 將已使用記錄保存到 localStorage（可選）
+    try {
+      localStorage.setItem('usedImagesRecord', JSON.stringify(usedImagesRecord));
+    } catch (e) {
+      console.warn('無法保存已使用圖片記錄到 localStorage:', e);
+    }
+    
+    return selectedImage;
   } catch (error) {
-    console.error('儲存圖片失敗:', error);
+    console.error('選擇圖片失敗:', error);
     throw error;
   }
 }
 
-// 使用 DALL-E 3 生成圖片
+// 在初始化時，嘗試從 localStorage 加載已使用記錄（可選）
+try {
+  const savedRecord = localStorage.getItem('usedImagesRecord');
+  if (savedRecord) {
+    usedImagesRecord = JSON.parse(savedRecord);
+  }
+} catch (e) {
+  console.warn('無法從 localStorage 加載已使用圖片記錄:', e);
+}
+
+// 使用預先存在的圖片而非生成新圖片
 export async function generateImage({ prompt }: { prompt: string }): Promise<string> {
   try {
-    const response = await openai.images.generate({
-      model: "dall-e-3",
-      prompt: prompt,
-      n: 1,
-      size: "1792x1024",
-      quality: "standard",
-      style: "vivid"
-    });
-
-    if (!response.data[0]?.url) {
-      throw new Error('No image generated');
+    // 從 prompt 中提取信件類型
+    let type = 'goal_created'; // 預設類型
+    
+    if (prompt === 'daily_feedback') {
+      type = 'daily_feedback';
+    } else if (prompt === 'weekly_review') {
+      type = 'weekly_review';
     }
-
-    // 儲存圖片到 Supabase Storage
-    try {
-      const permanentUrl = await saveImage(response.data[0].url);
-      return permanentUrl;
-    } catch (saveError) {
-      console.error('無法儲存圖片，使用臨時 URL:', saveError);
-      console.warn('注意：DALL-E 圖片 URL 將在約 2 小時後過期');
-      return response.data[0].url;
+    
+    // 獲取當前用戶 ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('未登入');
     }
+    
+    // 選擇一張未使用過的圖片
+    const imageUrl = await selectNonRepeatingImage(type, user.id);
+    
+    return imageUrl;
   } catch (error) {
-    console.error('Failed to generate image:', error);
-    // 如果生成失敗，使用預設的 Unsplash 圖片
-    return 'https://images.unsplash.com/photo-1493612276216-ee3925520721?w=1200';
+    console.error('選擇圖片失敗:', error);
+    
+    // 如果選擇失敗，使用預設的 Unsplash 圖片
+    let fallbackType = 'goal_created'; // 預設類型
+    
+    if (prompt === 'daily_feedback') {
+      fallbackType = 'daily_feedback';
+    } else if (prompt === 'weekly_review') {
+      fallbackType = 'weekly_review';
+    }
+    
+    return fallbackImageUrls[fallbackType as keyof typeof fallbackImageUrls];
   }
 }
