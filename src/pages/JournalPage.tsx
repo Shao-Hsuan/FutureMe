@@ -13,12 +13,14 @@ export default function JournalPage() {
   const navigate = useNavigate();
   const { goals } = useGoalStore();
 
-  // 檢查是否有目標
+  // 移除自動跳轉到 goal-setup 的邏輯
+  /*
   useEffect(() => {
     if (goals.length === 0) {
       navigate('/goal-setup', { replace: true });
     }
   }, [goals, navigate]);
+  */
 
   // Refresh prompt when navigating back to journal page
   useEffect(() => {

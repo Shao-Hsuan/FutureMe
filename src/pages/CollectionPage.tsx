@@ -23,13 +23,6 @@ export default function CollectionPage() {
   const [selectedCollects, setSelectedCollects] = useState<Collect[]>([]);
   const [isCaptionEditOpen, setIsCaptionEditOpen] = useState(false);
 
-  // 檢查是否有目標
-  useEffect(() => {
-    if (goals.length === 0) {
-      navigate('/goal-setup', { replace: true });
-    }
-  }, [goals, navigate]);
-
   useEffect(() => {
     loadCollects();
   }, [currentGoal?.id]);

@@ -25,7 +25,7 @@ export default function AuthRequired({ onFirstLogin }: AuthRequiredProps) {
       location.pathname.startsWith(path)
     );
 
-    // 如果沒有目標且不在目標相關頁面，導向到目標設置頁面
+    // 只有當沒有目標且不在目標相關頁面時，才導向到目標設置頁面
     if (goals.length === 0 && !isGoalRelatedPath) {
       console.log('🎯 No goals found, redirecting to goal setup');
       navigate('/goal-setup', { replace: true });
@@ -36,6 +36,7 @@ export default function AuthRequired({ onFirstLogin }: AuthRequiredProps) {
 
   useEffect(() => {
     let mounted = true;
+    let cleanupFn: (() => void) | undefined;
 
     const initializeAuth = async () => {
       if (status === AuthStatus.INITIALIZING) {
@@ -133,7 +134,6 @@ export default function AuthRequired({ onFirstLogin }: AuthRequiredProps) {
                   }
                   break;
                 case 'SIGNED_OUT':
-                case 'USER_DELETED':
                   console.log('User signed out, clearing state...');
                   setUser(null);
                   resetGoals();
@@ -160,12 +160,17 @@ export default function AuthRequired({ onFirstLogin }: AuthRequiredProps) {
       }
     };
 
-    const cleanup = initializeAuth();
+    // 啟動認證流程
+    initializeAuth().then(cleanup => {
+      if (mounted && cleanup) {
+        cleanupFn = cleanup;
+      }
+    });
 
     return () => {
       mounted = false;
-      if (cleanup && typeof cleanup === 'function') {
-        cleanup();
+      if (cleanupFn) {
+        cleanupFn();
       }
     };
   }, [status === AuthStatus.INITIALIZING]);

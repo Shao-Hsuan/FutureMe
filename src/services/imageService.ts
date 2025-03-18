@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { supabase } from './supabase';
 
 const openai = new OpenAI({
   apiKey: import.meta.env.VITE_OPENAI_API_KEY,
@@ -21,6 +22,33 @@ export function getImagePromptForLetter(type: string, goal: { title: string }) {
   }
 }
 
+// 使用 Edge Function 儲存圖片
+async function saveImage(url: string): Promise<string> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('未登入');
+
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/save-image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ url })
+    });
+
+    if (!response.ok) {
+      throw new Error('儲存圖片失敗');
+    }
+
+    const { url: permanentUrl } = await response.json();
+    return permanentUrl;
+  } catch (error) {
+    console.error('儲存圖片失敗:', error);
+    throw error;
+  }
+}
+
 // 使用 DALL-E 3 生成圖片
 export async function generateImage({ prompt }: { prompt: string }): Promise<string> {
   try {
@@ -37,7 +65,15 @@ export async function generateImage({ prompt }: { prompt: string }): Promise<str
       throw new Error('No image generated');
     }
 
-    return response.data[0].url;
+    // 儲存圖片到 Supabase Storage
+    try {
+      const permanentUrl = await saveImage(response.data[0].url);
+      return permanentUrl;
+    } catch (saveError) {
+      console.error('無法儲存圖片，使用臨時 URL:', saveError);
+      console.warn('注意：DALL-E 圖片 URL 將在約 2 小時後過期');
+      return response.data[0].url;
+    }
   } catch (error) {
     console.error('Failed to generate image:', error);
     // 如果生成失敗，使用預設的 Unsplash 圖片
