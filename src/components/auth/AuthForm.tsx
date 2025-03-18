@@ -12,7 +12,7 @@ export default function AuthForm() {
   const [error, setError] = useState<string>();
   const [showLoginForm, setShowLoginForm] = useState(false); 
   const navigate = useNavigate();
-  const { user, setUser, status, setStatus } = useAuthStore();
+  const { user, setUser, status } = useAuthStore();
 
   useEffect(() => {
     const checkAuth = async () => {
