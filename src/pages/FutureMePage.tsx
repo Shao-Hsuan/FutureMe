@@ -186,24 +186,25 @@ export default function FutureMePage() {
                 onClick={() => navigate(`/future-me/${letter.id}`)}
                 className="w-full bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
               >
-                <img
-                  src={letter.front_image}
-                  alt={letter.title}
-                  className="w-full aspect-[3/1] object-cover"
-                />
+                <div className="w-full p-4 flex justify-center">
+                  <img
+                    src={letter.front_image}
+                    alt={letter.title}
+                    className="max-w-full object-contain bg-gray-100 border-[14px] border-white rounded-lg shadow-lg transform rotate-[-2deg] hover:rotate-0 transition-transform duration-300"
+                    style={{ maxHeight: '300px' }}
+                  />
+                </div>
                 <div className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-medium text-gray-900 mb-1">
-                        {letter.title}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {formatDistanceToNow(new Date(letter.created_at), {
-                          addSuffix: true,
-                          locale: zhTW
-                        })}
-                      </p>
-                    </div>
+                  <div className="flex flex-col items-start text-left w-full">
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">
+                      {letter.title}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {formatDistanceToNow(new Date(letter.created_at), {
+                        addSuffix: true,
+                        locale: zhTW
+                      })}
+                    </p>
                     <StatusBadge status={letter.read_at ? 'read' : 'unread'} />
                   </div>
                   <div className="mt-4 flex items-center text-blue-500 text-sm">
