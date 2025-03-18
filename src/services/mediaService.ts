@@ -55,6 +55,80 @@ function validateFile(file: File): void {
   }
 }
 
+// 壓縮圖片以加快上傳速度
+async function compressImage(file: File, maxWidth = 1920, quality = 0.8): Promise<File> {
+  // 如果不是圖片，或已經是 WebP/AVIF 等高效格式，則直接返回
+  if (!file.type.startsWith('image/') || file.size < 1 * 1024 * 1024) {
+    return file;
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      
+      // 計算新的尺寸，保持原始比例
+      let width = img.width;
+      let height = img.height;
+      
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('無法創建 canvas context'));
+        return;
+      }
+      
+      // 繪製調整大小後的圖像
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      // 轉換為 blob
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('圖片壓縮失敗'));
+            return;
+          }
+          
+          // 創建新文件，保留原始擴展名
+          const fileName = file.name;
+          const compressedFile = new File(
+            [blob], 
+            fileName, 
+            { type: 'image/jpeg' }
+          );
+          
+          console.log(`壓縮前: ${formatFileSize(file.size)}, 壓縮後: ${formatFileSize(compressedFile.size)}`);
+          resolve(compressedFile);
+        },
+        'image/jpeg',
+        quality
+      );
+    };
+    
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('圖片加載失敗'));
+    };
+    
+    img.src = url;
+  });
+}
+
+// 檢測是否為移動設備
+function isMobileDevice(): boolean {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
 // 修改上傳函數
 async function uploadFile(
   file: File, 
@@ -63,6 +137,19 @@ async function uploadFile(
   try {
     // 驗證檔案
     validateFile(file);
+
+    // 壓縮圖片檔案，特別是從移動設備上傳的大文件
+    let fileToUpload = file;
+    if (file.type.startsWith('image/')) {
+      const isMobile = isMobileDevice();
+      // 移動設備使用更激進的壓縮
+      if (isMobile) {
+        fileToUpload = await compressImage(file, 1280, 0.75);
+      } else if (file.size > 3 * 1024 * 1024) {
+        // 大於 3MB 的圖片進行壓縮
+        fileToUpload = await compressImage(file);
+      }
+    }
 
     // 驗證存取權限
     const { userId, bucket } = await verifyStorageAccess();
@@ -74,10 +161,10 @@ async function uploadFile(
     // 上傳檔案
     const { error: uploadError, data } = await supabase.storage
       .from(bucket)
-      .upload(fileName, file, {
+      .upload(fileName, fileToUpload, {
         cacheControl: '3600',
         upsert: false,
-        contentType: file.type, // 明確設定 content-type
+        contentType: fileToUpload.type, // 明確設定 content-type
         onUploadProgress: (progress) => {
           const percentage = (progress.loaded / progress.total) * 100;
           onProgress?.(Math.round(percentage));
