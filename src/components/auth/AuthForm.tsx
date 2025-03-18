@@ -10,6 +10,7 @@ export default function AuthForm() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>();
+  const [showLoginForm, setShowLoginForm] = useState(false); 
   const navigate = useNavigate();
   const { user, setUser, status, setStatus } = useAuthStore();
 
@@ -65,7 +66,47 @@ export default function AuthForm() {
     );
   }
 
-  return (
+  // 說明頁元件
+  const IntroductionPage = () => (
+    <div className="min-h-screen flex items-start justify-center bg-gray-50 py-20 px-10 sm:px-12 lg:px-16">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-left text-3xl font-extrabold text-gray-900">
+            Goal Journey
+          </h2>
+          <p className="mt-2 text-left text-lg text-gray-600">
+            專屬於你的目標的秘密基地
+          </p>
+        </div>
+        
+        <div className="mt-8 space-y-4">
+          <div>
+            <p className="text-gray-800">
+              為了顧及你的使用體驗，請你先按照以下步驟做：
+            </p>
+            <ol className="mt-4 space-y-2 text-gray-700 list-decimal pl-5">
+              <li>點擊 <span className="font-medium">按鈕</span> 按鈕</li>
+              <li>往下滑動點擊「新增至主畫面」</li>
+              <li>從主畫面中點擊 Goal Journey</li>
+            </ol>
+            <p className="mt-4 text-gray-800">
+              這樣就不會使用瀏覽器打開啦！
+            </p>
+          </div>
+          
+          <button
+            onClick={() => setShowLoginForm(true)}
+            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            下一步
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // 主要登入表單元件
+  const LoginFormContent = () => (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
@@ -100,4 +141,7 @@ export default function AuthForm() {
       </div>
     </div>
   );
+
+  // 根據狀態顯示說明頁或登入表單
+  return showLoginForm ? <LoginFormContent /> : <IntroductionPage />;
 }
