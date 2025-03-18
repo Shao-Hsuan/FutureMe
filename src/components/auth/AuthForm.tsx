@@ -10,7 +10,7 @@ export default function AuthForm() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>();
-  const [showLoginForm, setShowLoginForm] = useState(false); 
+  const [showLoginForm, setShowLoginForm] = useState(false); // 新增狀態控制是否顯示登入表單
   const navigate = useNavigate();
   const { user, setUser, status } = useAuthStore();
 
@@ -72,7 +72,7 @@ export default function AuthForm() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-left text-3xl font-extrabold text-gray-900">
-            Goal Journey
+            Goal Journal
           </h2>
           <p className="mt-2 text-left text-lg text-gray-600">
             專屬於你的目標的秘密基地
@@ -82,12 +82,14 @@ export default function AuthForm() {
         <div className="mt-8 space-y-4">
           <div>
             <p className="text-gray-800">
-              為了顧及你的使用體驗，請你先按照以下步驟做：
+              為了顧及你的使用體驗，請你先按照以下步驟做（iPhone 使用者）：
             </p>
             <ol className="mt-4 space-y-2 text-gray-700 list-decimal pl-5">
-              <li>點擊 <span className="font-medium">按鈕</span> 按鈕</li>
+              <li>點擊 <span className="font-medium inline-flex items-center">
+                <img src="/square-and-arrow-up.svg" className="w-5 h-5 mr-1" alt="分享圖標" /> 
+              </span> 按鈕</li>
               <li>往下滑動點擊「新增至主畫面」</li>
-              <li>從主畫面中點擊 Goal Journey</li>
+              <li>從主畫面中點擊 Goal Journal</li>
             </ol>
             <p className="mt-4 text-gray-800">
               這樣就不會使用瀏覽器打開啦！
@@ -111,8 +113,14 @@ export default function AuthForm() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {isSignUp ? '建立帳號' : '登入帳號'}
+            Goal Journal
           </h2>
+          <p className="mt-2 text-center text-lg text-gray-600 mb-6">
+            專屬於你的目標的秘密基地
+          </p>
+          <h3 className="text-center text-xl font-bold text-gray-900">
+            {isSignUp ? '建立帳號' : '登入帳號'}
+          </h3>
           {error && (
             <div className="mt-4 flex items-center gap-2 text-red-500 text-sm bg-red-50 p-3 rounded-lg">
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
