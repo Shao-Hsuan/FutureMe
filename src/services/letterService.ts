@@ -24,7 +24,7 @@ export async function generateLetter(options: GenerateLetterOptions) {
     if (currentStatus.nextAvailableAt) {
       const nextAvailableTime = new Date(currentStatus.nextAvailableAt).getTime();
       if (Date.now() < nextAvailableTime) {
-        throw new Error('每 24 小時只能生成一次信件');
+        throw new Error('每 24 小時只能接收來自未來的信一次');
       }
     }
 
@@ -59,10 +59,10 @@ export async function generateLetter(options: GenerateLetterOptions) {
     const journals = journalsResponse.data || [];
     const collects = collectsResponse.data || [];
 
-    // 5. 更新狀態
+    // 5. 初始化狀態
     const status: LetterStatus = {
       status: 'generating',
-      progress: 0,
+      progress: 10,
       startTime: new Date().toISOString(),
       type,
       metadata: {
@@ -72,11 +72,10 @@ export async function generateLetter(options: GenerateLetterOptions) {
         collectCount: collects.length
       }
     };
-
     updateStatus(status);
 
     try {
-      // 6. 生成信件內容
+      // 6. 接收來自未來的信內容
       updateStatus({ ...status, progress: 30 });
       const letterContent = await generateLetterContent({
         type,
@@ -145,7 +144,7 @@ export async function generateLetter(options: GenerateLetterOptions) {
       return newLetter;
     } catch (error) {
       console.error('Letter generation error:', error);
-      throw new Error('生成信件失敗：' + (error instanceof Error ? error.message : '伺服器錯誤'));
+      throw new Error('接收來自未來的信失敗：' + (error instanceof Error ? error.message : '伺服器錯誤'));
     }
   } catch (error) {
     console.error('Failed to generate letter:', error);
@@ -153,7 +152,7 @@ export async function generateLetter(options: GenerateLetterOptions) {
     const errorStatus: LetterStatus = {
       status: 'error',
       progress: 0,
-      error: error instanceof Error ? error.message : '生成信件失敗',
+      error: error instanceof Error ? error.message : '接收來自未來的信失敗',
       startTime: new Date().toISOString(),
       endTime: new Date().toISOString(),
       type
@@ -175,17 +174,14 @@ export async function markLetterAsRead(id: string) {
   if (error) throw error;
 }
 
-// 獲取距離下次可生成信件的時間（毫秒）
+// 獲取距離下次可接收來自未來的信的時間（毫秒）
 export function getTimeUntilNextGeneration(): number {
   const { currentStatus } = useLetterStore.getState();
   
-  if (!currentStatus.nextAvailableAt) {
-    return 0; // 可以立即生成
-  }
+  if (!currentStatus.nextAvailableAt) return 0;
   
   const nextTime = new Date(currentStatus.nextAvailableAt).getTime();
   const now = Date.now();
-  const diff = nextTime - now;
   
-  return diff > 0 ? diff : 0;
+  return Math.max(0, nextTime - now);
 }

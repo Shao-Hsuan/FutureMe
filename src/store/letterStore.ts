@@ -8,8 +8,8 @@ export interface LetterStatus {
   startTime?: string;
   endTime?: string;
   type?: 'goal_created' | 'daily_feedback' | 'weekly_review';
-  lastGeneratedAt?: string; // 上次生成信件的時間
-  nextAvailableAt?: string; // 下次可以生成信件的時間
+  lastGeneratedAt?: string; // 上次接收來自未來的信的時間
+  nextAvailableAt?: string; // 下次可以接收來自未來的信的時間
   metadata?: {
     goalId?: string;
     goalTitle?: string;
