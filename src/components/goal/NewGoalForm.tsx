@@ -3,6 +3,7 @@ import { X, Check, Image as ImageIcon } from 'lucide-react';
 import { createGoal } from '../../services/supabase';
 import { openMediaPicker } from '../../services/mediaService';
 import { useGoalStore } from '../../store/goalStore';
+import Toast from '../shared/Toast';
 
 interface NewGoalFormProps {
   isOpen: boolean;
@@ -13,16 +14,42 @@ export default function NewGoalForm({ isOpen, onClose }: NewGoalFormProps) {
   const [title, setTitle] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<{
+    type: 'success' | 'error' | 'loading';
+    message: string;
+  } | null>(null);
   const addGoal = useGoalStore(state => state.addGoal);
 
   if (!isOpen) return null;
 
   const handleImageSelect = async () => {
     try {
-      const [media] = await openMediaPicker({ multiple: false, accept: 'image/*' });
-      setImageUrl(media.url);
+      setUploadStatus({ type: 'loading', message: '上傳中...' });
+      const [media] = await openMediaPicker(
+        { multiple: false, accept: 'image/*' },
+        (progress, fileName) => {
+          console.log(`上傳進度: ${progress}%, 檔案: ${fileName}`);
+          if (progress < 100) {
+            setUploadStatus({ type: 'loading', message: `上傳中... ${progress}%` });
+          }
+        },
+        { imageInfo: '圖片上限 50MB' }
+      );
+      
+      if (media && media.url) {
+        setImageUrl(media.url);
+        setUploadStatus({ type: 'success', message: '上傳成功' });
+        setTimeout(() => setUploadStatus(null), 3000);
+      } else {
+        throw new Error('未獲取到有效的圖片 URL');
+      }
     } catch (error) {
       console.error('Failed to select image:', error);
+      setUploadStatus({ 
+        type: 'error', 
+        message: error instanceof Error ? error.message : '上傳圖片失敗，請稍後再試'
+      });
+      setTimeout(() => setUploadStatus(null), 5000);
     }
   };
 
@@ -96,6 +123,16 @@ export default function NewGoalForm({ isOpen, onClose }: NewGoalFormProps) {
             <span>建立目標</span>
           </button>
         </div>
+        
+        {/* Upload Status Toast */}
+        {uploadStatus && (
+          <Toast
+            message={uploadStatus.message}
+            type={uploadStatus.type}
+            onClose={() => setUploadStatus(null)}
+            duration={uploadStatus.type === 'error' ? 5000 : 3000}
+          />
+        )}
       </div>
     </div>
   );
