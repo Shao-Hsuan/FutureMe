@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { Collect, TextCollectColor } from '../types/collect';
 import type { Letter } from '../types/letter';
+import { getLinkPreview as getLinkPreviewCached, PeekalinkPreview } from './linkService';
 
 export async function getCollects(goalId: string): Promise<Collect[]> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -118,27 +119,35 @@ export async function getLinkPreview(url: string): Promise<{
     if (cleanUrl.indexOf('http', 8) !== -1) {
       cleanUrl = cleanUrl.substring(0, cleanUrl.indexOf('http', 8));
     }
-
-    // 確保 URL 格式正確
-    let urlObj;
+    
+    // 確保URL格式正確
+    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+      cleanUrl = 'https://' + cleanUrl;
+    }
+    
+    // 嘗試解析URL以便獲取域名等信息
+    let urlObj: URL;
     try {
-      // 嘗試自動修復缺少協議的 URL
-      if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-        cleanUrl = 'https://' + cleanUrl;
-      }
       urlObj = new URL(cleanUrl);
     } catch (e) {
-      // 無效的 URL 格式
       console.error('URL格式無效:', e);
       return {
         title: url,
         image: null,
         description: null,
-        url,
+        url: cleanUrl,
         type: 'link'
       };
     }
 
+    // 優先使用緩存的連結預覽系統
+    const cachedPreview = await getLinkPreviewCached(cleanUrl);
+    
+    if (cachedPreview) {
+      // 從緩存獲取數據成功，進行格式轉換
+      return convertPeekalinkToStandardFormat(cachedPreview, cleanUrl);
+    }
+    
     // 處理 YouTube 連結
     if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
       const videoId = urlObj.hostname.includes('youtu.be') 
@@ -404,20 +413,83 @@ export async function getLinkPreview(url: string): Promise<{
       };
     }
   } catch (error) {
-    // 全局錯誤處理
-    console.error('連結預覽處理失敗:', error);
-    
-    // 保證始終返回有效對象
+    console.error('獲取連結預覽時出錯:', error);
     return {
       title: url,
       image: null,
       description: null,
-      url,
-      type: 'link',
-      siteName: undefined,
-      ogType: 'website'
+      url: url,
+      type: 'link'
     };
   }
+}
+
+/**
+ * 將Peekalink預覽數據轉換為標準格式
+ */
+function convertPeekalinkToStandardFormat(preview: PeekalinkPreview, url: string): {
+  title: string;
+  image: string | null;
+  description: string | null;
+  url: string;
+  type: 'link' | 'youtube' | 'instagram' | 'facebook' | 'pinterest' | 'behance';
+  videoId?: string;
+  siteName?: string;
+  ogType?: string;
+} {
+  // 確定連結類型
+  let type: 'link' | 'youtube' | 'instagram' | 'facebook' | 'pinterest' | 'behance' = 'link';
+  let videoId: string | undefined;
+  
+  // 嘗試解析URL以便進行更精確的類型判斷
+  let domain = '';
+  try {
+    const urlObj = new URL(url);
+    domain = urlObj.hostname;
+    
+    if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
+      type = 'youtube';
+      // 提取YouTube視頻ID
+      const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+      videoId = ytMatch ? ytMatch[1] : undefined;
+    } else if (urlObj.hostname.includes('instagram.com')) {
+      type = 'instagram';
+    } else if (urlObj.hostname.includes('facebook.com')) {
+      type = 'facebook';
+    } else if (urlObj.hostname.includes('pinterest.com')) {
+      type = 'pinterest';
+    } else if (urlObj.hostname.includes('behance.net')) {
+      type = 'behance';
+    }
+  } catch (e) {
+    // 如果URL解析失敗，使用簡單的字符串比較
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      type = 'youtube';
+      // 提取YouTube視頻ID
+      const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+      videoId = ytMatch ? ytMatch[1] : undefined;
+    } else if (url.includes('instagram.com')) {
+      type = 'instagram';
+    } else if (url.includes('facebook.com')) {
+      type = 'facebook';
+    } else if (url.includes('pinterest.com')) {
+      type = 'pinterest';
+    } else if (url.includes('behance.net')) {
+      type = 'behance';
+    }
+    domain = preview.domain;
+  }
+  
+  return {
+    title: preview.title || url,
+    image: preview.image?.medium?.url || preview.image?.thumbnail?.url || null,
+    description: preview.description || null,
+    url: preview.url || url,
+    type: type,
+    videoId: videoId,
+    siteName: domain || preview.domain,
+    ogType: preview.type
+  };
 }
 
 export async function getLetter(id: string): Promise<Letter> {
