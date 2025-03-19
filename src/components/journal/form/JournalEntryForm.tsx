@@ -8,6 +8,7 @@ import ImageGrid from '../../shared/ImageGrid';
 import CollectDetailSheet from '../../collection/CollectDetailSheet';
 import ImageGallery from '../../shared/ImageGallery';
 import ProgressBar from '../../shared/ProgressBar';
+import TextCollectGrid from './TextCollectGrid';
 import { MediaFile } from '../../../types/media';
 import { JournalEntry } from '../../../types/journal';
 import { useNavigate } from 'react-router-dom';
@@ -279,6 +280,14 @@ export default function JournalEntryForm({
               }}
               onDelete={(index) => handleMediaRemove(index)}
               selectedVideo={selectedVideo}
+            />
+          )}
+          
+          {/* 顯示文本收藏（包括連結） */}
+          {textCollects.length > 0 && (
+            <TextCollectGrid 
+              collects={textCollects}
+              onDelete={handleTextCollectRemove}
             />
           )}
           

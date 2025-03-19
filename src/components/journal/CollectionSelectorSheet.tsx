@@ -1,14 +1,27 @@
 import { useState, useEffect } from 'react';
-import { X, Check } from 'lucide-react';
+import { X } from 'lucide-react';
 import { getCollects } from '../../services/collectService';
 import { useGoalStore } from '../../store/goalStore';
 import type { Collect } from '../../types/collect';
 import CollectCard from '../collection/CollectCard';
 
+interface TextCollect {
+  type: 'text' | 'link';
+  content: string;
+  title?: string;
+  preview_image?: string;
+  color?: string;
+}
+
+interface CollectSelection {
+  initialTextCollects: TextCollect[];
+  initialMediaUrls: string[];
+}
+
 interface CollectionSelectorSheetProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (collects: Collect[]) => void;
+  onSelect: (selection: CollectSelection) => void;
 }
 
 export default function CollectionSelectorSheet({
@@ -36,8 +49,10 @@ export default function CollectionSelectorSheet({
   const loadCollects = async () => {
     try {
       setIsLoading(true);
-      const data = await getCollects(currentGoal!.id);
-      setCollects(data);
+      if (currentGoal?.id) {
+        const data = await getCollects(String(currentGoal.id));
+        setCollects(data);
+      }
     } catch (error) {
       console.error('Failed to load collects:', error);
     } finally {
@@ -61,7 +76,7 @@ export default function CollectionSelectorSheet({
     const textCollects = selectedCollects
       .filter(collect => collect.type === 'text' || collect.type === 'link')
       .map(collect => ({
-        type: collect.type,
+        type: collect.type as 'text' | 'link',
         content: collect.content,
         title: collect.title,
         preview_image: collect.preview_image,

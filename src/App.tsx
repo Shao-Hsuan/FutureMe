@@ -16,6 +16,7 @@ import AuthRequired from './components/auth/AuthRequired';
 import UsageGuideSheet from './components/settings/UsageGuideSheet';
 import GlobalLoading from './components/shared/GlobalLoading';
 import { supabase } from './services/supabase';
+import { LinkPreviewExample } from './examples/LinkPreviewExample';
 
 function App() {
   const [showGuide, setShowGuide] = useState(false);
@@ -63,6 +64,7 @@ function App() {
             <Route path="/collection" element={<CollectionPage />} />
             <Route path="/future-me" element={<FutureMePage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/link-preview-demo" element={<LinkPreviewExample />} />
           </Route>
           
           {/* Detail pages (without TabBar) */}

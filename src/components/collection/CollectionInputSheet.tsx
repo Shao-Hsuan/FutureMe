@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Check } from 'lucide-react';
 import type { Collect, TextCollectColor } from '../../types/collect';
+import LinkPreview from '../shared/LinkPreview';
+// 移除未使用的導入
+// import { getLinkPreview } from '../../services/linkService';
 
 interface CollectionInputSheetProps {
   isOpen: boolean;
@@ -27,6 +30,24 @@ export default function CollectionInputSheet({
   const [caption, setCaption] = useState('');
   const [selectedColor, setSelectedColor] = useState<TextCollectColor>('blue');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [isValidURL, setIsValidURL] = useState(true);
+
+  useEffect(() => {
+    if (type === 'link' && content) {
+      // 檢查URL是否有效
+      try {
+        new URL(content);
+        setIsValidURL(true);
+        setShowPreview(true);
+      } catch {
+        setIsValidURL(false);
+        setShowPreview(false);
+      }
+    } else {
+      setShowPreview(false);
+    }
+  }, [content, type]);
 
   if (!isOpen) return null;
 
@@ -43,6 +64,7 @@ export default function CollectionInputSheet({
       setContent('');
       setCaption('');
       setSelectedColor('blue');
+      setShowPreview(false);
       onClose();
     } catch (error) {
       console.error('Failed to submit:', error);
@@ -54,7 +76,7 @@ export default function CollectionInputSheet({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
-      <div className="fixed inset-x-0 bottom-0 bg-white rounded-t-2xl p-4 animate-slide-up">
+      <div className="fixed inset-x-0 bottom-0 bg-white rounded-t-2xl p-4 animate-slide-up max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">
             {type === 'text' ? '新增想法' : '新增連結'}
@@ -70,7 +92,7 @@ export default function CollectionInputSheet({
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder={type === 'text' ? '輸入想法...' : '輸入連結網址...'}
-              className={`w-full h-32 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full h-32 p-3 border ${!isValidURL && type === 'link' ? 'border-red-500' : 'border-gray-300'} rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 type === 'text' ? selectedColor === 'blue' ? 'bg-blue-50' :
                   selectedColor === 'green' ? 'bg-green-50' :
                   selectedColor === 'yellow' ? 'bg-yellow-50' :
@@ -78,7 +100,20 @@ export default function CollectionInputSheet({
                   'bg-pink-50' : ''
               }`}
             />
+            {!isValidURL && type === 'link' && content && (
+              <p className="text-red-500 text-sm mt-1">請輸入有效的URL，例如：https://example.com</p>
+            )}
           </div>
+
+          {/* 顯示連結預覽 */}
+          {showPreview && type === 'link' && isValidURL && (
+            <div className="mt-4">
+              <p className="text-sm font-medium text-gray-500 mb-2">連結預覽</p>
+              <LinkPreview 
+                url={content} 
+              />
+            </div>
+          )}
 
           {type === 'text' && (
             <div>
@@ -113,7 +148,7 @@ export default function CollectionInputSheet({
 
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || !content}
+            disabled={isSubmitting || !content || (type === 'link' && !isValidURL)}
             className="w-full py-3 bg-blue-500 text-white rounded-lg flex items-center justify-center space-x-2 disabled:opacity-50"
           >
             <Check className="w-5 h-5" />

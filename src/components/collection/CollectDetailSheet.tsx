@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, Check, Save, Trash2 } from 'lucide-react';
+import { X, Save, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { updateCollect, deleteCollect } from '../../services/collectService';
 import { useConfirm } from '../../hooks/useConfirm';
+import LinkPreview from '../shared/LinkPreview';
 import type { Collect, TextCollectColor } from '../../types/collect';
 
 interface CollectDetailSheetProps {
@@ -200,22 +201,14 @@ export default function CollectDetailSheet({
         );
       case 'link':
         return (
-          <div 
-            onClick={handleContentClick}
-            className="space-y-4 cursor-pointer"
-          >
-            {localCollect.preview_image && (
-              <img
-                src={localCollect.preview_image}
-                alt={localCollect.title}
-                className="w-full rounded-lg"
+          <div className="space-y-4">
+            <div onClick={handleContentClick}>
+              <LinkPreview 
+                url={localCollect.content} 
               />
-            )}
-            <div className="space-y-2">
-              <h3 className="text-lg font-medium text-gray-800">
-                {localCollect.title || localCollect.content}
-              </h3>
-              <p className="text-blue-500 text-sm">{localCollect.content}</p>
+            </div>
+            <div className="px-2">
+              <p className="text-blue-500 text-sm break-all">{localCollect.content}</p>
             </div>
           </div>
         );
