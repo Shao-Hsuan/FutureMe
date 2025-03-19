@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Image as ImageIcon } from 'lucide-react';
-import { createGoal } from '../services/supabase';
-import { openMediaPicker } from '../services/mediaService';
-import { useGoalStore } from '../store/goalStore';
-import Toast from '../components/shared/Toast';
+import { createGoal } from '../../services/supabase';
+import { openMediaPicker } from '../../services/mediaService';
+import { useGoalStore } from '../../store/goalStore';
+import Toast from '../shared/Toast';
 
 interface GoalSetupStep {
   title: string;
@@ -32,38 +32,96 @@ export default function GoalSetupPage() {
   const [imageUrl, setImageUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string>();
   const [toast, setToast] = useState<{
     type: 'success' | 'error' | 'loading';
     message: string;
   } | null>(null);
   const navigate = useNavigate();
-  const addGoal = useGoalStore(state => state.addGoal);
+  const addGoal = useGoalStore((state: any) => state.addGoal);
 
   const handleImageSelect = async () => {
     try {
       setError(undefined);
       setIsUploading(true);
-      setToast({ type: 'loading', message: '上傳圖片中...' });
+      setUploadProgress(0);
+      setToast({ type: 'loading', message: '準備上傳圖片...' });
 
-      const [media] = await openMediaPicker({ 
+      // 設定媒體選擇器選項
+      const mediaOptions = { 
         multiple: false, 
         accept: 'image/*',
         maxSize: 10 * 1024 * 1024 // 10MB
-      }, (progress) => {
-        setToast({ type: 'loading', message: `上傳中 ${progress}%` });
-      });
+      };
+      
+      // 設定上傳進度回調函數
+      const progressCallback = (progress: number, _fileName: string) => {
+        setUploadProgress(progress);
+        setToast({ 
+          type: 'loading', 
+          message: progress === 100 
+            ? '處理圖片中...' 
+            : `上傳中 ${progress}%` 
+        });
+      };
+      
+      // 設定額外信息
+      const infoOptions = {
+        imageInfo: '建議上傳寬高比16:9的橫向圖片，最大10MB'
+      };
+      
+      // 設定上傳選項
+      const uploadOptions = {
+        timeout: 60000 // 60秒超時
+      };
+
+      const [media] = await openMediaPicker(
+        mediaOptions, 
+        progressCallback,
+        infoOptions,
+        uploadOptions
+      );
 
       setImageUrl(media.url);
       setToast({ type: 'success', message: '圖片上傳成功' });
+      
+      // 延遲清除上傳狀態，確保用戶能看到成功訊息
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadProgress(0);
+      }, 500);
     } catch (error) {
-      console.error('Failed to select image:', error);
-      setError(error instanceof Error ? error.message : '選擇圖片失敗');
-      setToast({ type: 'error', message: error instanceof Error ? error.message : '圖片上傳失敗' });
-    } finally {
+      console.error('選擇圖片失敗:', error);
+      const errorMessage = error instanceof Error ? error.message : '圖片上傳失敗';
+      
+      // 根據錯誤類型顯示不同訊息
+      let userMessage = errorMessage;
+      if (errorMessage.includes('上傳超時')) {
+        userMessage = '圖片上傳超時，請檢查網絡連接或嘗試較小的圖片';
+      } else if (errorMessage.includes('檔案大小超過限制')) {
+        userMessage = '圖片檔案過大，請選擇較小的圖片（最大10MB）';
+      } else if (errorMessage.includes('不支援的檔案格式')) {
+        userMessage = '不支援的圖片格式，請選擇 JPG、PNG 或 WebP 格式';
+      }
+      
+      setError(userMessage);
+      setToast({ type: 'error', message: userMessage });
       setIsUploading(false);
+      setUploadProgress(0);
+    } finally {
+      // 確保清除 toast 提示
       setTimeout(() => setToast(null), 3000);
     }
+  };
+
+  // 添加取消上傳功能
+  const handleCancelUpload = () => {
+    // mediaService 中的 currentUploadController 會在下次上傳時被中止
+    setIsUploading(false);
+    setUploadProgress(0);
+    setToast({ type: 'error', message: '已取消上傳' });
+    setTimeout(() => setToast(null), 2000);
   };
 
   const handleNext = async () => {
@@ -114,24 +172,51 @@ export default function GoalSetupPage() {
         );
       case 1:
         return (
-          <div 
-            onClick={handleImageSelect}
-            className={`aspect-video rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors ${
-              imageUrl ? 'p-0' : 'p-4'
-            } ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {imageUrl ? (
-              <img 
-                src={imageUrl} 
-                alt="目標圖片"
-                className="w-full h-full object-cover rounded-xl"
-              />
-            ) : (
-              <div className="flex flex-col items-center text-gray-500">
-                <ImageIcon className="w-8 h-8 mb-2" />
-                <span>{isUploading ? '上傳中...' : '選擇圖片'}</span>
-              </div>
-            )}
+          <div className="space-y-4">
+            <div 
+              onClick={!isUploading ? handleImageSelect : undefined}
+              className={`aspect-video rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors ${
+                imageUrl ? 'p-0' : 'p-4'
+              } ${isUploading ? 'opacity-70 cursor-default' : ''}`}
+            >
+              {imageUrl ? (
+                <img 
+                  src={imageUrl} 
+                  alt="目標圖片"
+                  className="w-full h-full object-cover rounded-xl"
+                />
+              ) : (
+                <div className="flex flex-col items-center text-gray-500">
+                  <ImageIcon className="w-8 h-8 mb-2" />
+                  <span>{isUploading ? '上傳中...' : '選擇圖片'}</span>
+                  {isUploading && (
+                    <div className="mt-2 w-full max-w-[200px]">
+                      <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-500 rounded-full transition-all duration-300" 
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-1">
+                        <span className="text-xs">{uploadProgress}%</span>
+                        <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            handleCancelUpload(); 
+                          }}
+                          className="text-xs text-red-500 hover:underline"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="text-sm text-gray-500 text-center">
+              點擊選擇或更換圖片，建議使用 16:9 的橫向圖片
+            </p>
           </div>
         );
       case 2:

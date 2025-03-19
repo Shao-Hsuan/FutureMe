@@ -129,27 +129,66 @@ function isMobileDevice(): boolean {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
+// 檢測是否為 iOS 設備
+function isIOSDevice(): boolean {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+// 建立可取消的上傳控制器
+let currentUploadController: AbortController | null = null;
+
 // 修改上傳函數
 async function uploadFile(
   file: File, 
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  options?: {
+    timeout?: number;  // 超時時間（毫秒）
+  }
 ): Promise<string> {
   try {
+    // 如果有之前的上傳，取消它（注意：目前只是設置標記，實際取消需依賴超時機制）
+    if (currentUploadController) {
+      currentUploadController.abort();
+    }
+    currentUploadController = new AbortController();
+    
+    // 設置默認超時時間（30秒）
+    const timeout = options?.timeout || 30000;
+    
+    // 確保在起始階段調用進度回調
+    onProgress?.(0);
+    
     // 驗證檔案
     validateFile(file);
+    console.log(`開始處理檔案: ${file.name}，類型: ${file.type}，大小: ${formatFileSize(file.size)}`);
 
     // 壓縮圖片檔案，特別是從移動設備上傳的大文件
     let fileToUpload = file;
     if (file.type.startsWith('image/')) {
-      const isMobile = isMobileDevice();
-      // 移動設備使用更激進的壓縮
-      if (isMobile) {
+      const isIOS = isIOSDevice();
+      // iOS 設備使用更保守的壓縮方式
+      if (isIOS) {
+        try {
+          console.log('iOS 設備檢測到，使用保守壓縮設置');
+          fileToUpload = await compressImage(file, 1024, 0.9);
+          console.log(`iOS 圖片壓縮後大小: ${formatFileSize(fileToUpload.size)}`);
+        } catch (compressError) {
+          console.error('iOS 圖片壓縮失敗，使用原始檔案:', compressError);
+          // 壓縮失敗時使用原檔案
+          fileToUpload = file;
+        }
+      } else if (isMobileDevice()) {
         fileToUpload = await compressImage(file, 1280, 0.75);
+        console.log(`其他移動設備圖片壓縮後大小: ${formatFileSize(fileToUpload.size)}`);
       } else if (file.size > 3 * 1024 * 1024) {
         // 大於 3MB 的圖片進行壓縮
         fileToUpload = await compressImage(file);
+        console.log(`桌面設備大檔案壓縮後大小: ${formatFileSize(fileToUpload.size)}`);
       }
     }
+
+    // 進度更新到 20%（處理完成，準備上傳）
+    onProgress?.(20);
 
     // 驗證存取權限
     const { userId, bucket } = await verifyStorageAccess();
@@ -157,27 +196,58 @@ async function uploadFile(
     // 生成檔案名稱
     const fileExt = file.name.split('.').pop();
     const fileName = `${userId}/${uuidv4()}.${fileExt}`;
+    
+    console.log(`準備上傳檔案: ${fileName}, 類型: ${fileToUpload.type}, 大小: ${formatFileSize(fileToUpload.size)}`);
 
-    // 上傳檔案
-    const { error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, fileToUpload, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: fileToUpload.type // 明確設定 content-type
-      });
+    // 創建超時 Promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      const id = setTimeout(() => {
+        clearTimeout(id);
+        reject(new Error(`上傳超時 (${timeout}ms)`));
+      }, timeout);
+    });
 
-    // 手動回報進度為 100%（完成）
-    onProgress?.(100);
+    // 進度更新到 40%（開始上傳）
+    onProgress?.(40);
+
+    // 創建上傳 Promise
+    const uploadPromise = new Promise<{error: any | null}>((resolve) => {
+      // 上傳檔案
+      supabase.storage
+        .from(bucket)
+        .upload(fileName, fileToUpload, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: fileToUpload.type // 明確設定 content-type
+        }).then(result => {
+          resolve(result);
+        }).catch(error => {
+          resolve({ error });
+        });
+    });
+
+    // 同時執行上傳與超時檢查
+    const { error: uploadError } = await Promise.race([
+      uploadPromise,
+      timeoutPromise
+    ]);
+
+    // 進度更新到 80%（上傳完成，準備獲取 URL）
+    onProgress?.(80);
 
     if (uploadError) {
-      if (uploadError.message.includes('storage/unauthorized')) {
+      console.error(`上傳失敗: ${uploadError.message}`);
+      if (uploadError.message?.includes('AbortError') || 
+          uploadError.message?.includes('abort')) {
+        throw new Error('上傳已取消');
+      }
+      if (uploadError.message?.includes('storage/unauthorized')) {
         throw new Error('未授權的操作，請重新登入');
       }
-      if (uploadError.message.includes('Payload too large')) {
+      if (uploadError.message?.includes('Payload too large')) {
         throw new Error(`檔案大小超過限制：${formatFileSize(file.size)}`);
       }
-      throw new Error('檔案上傳失敗，請稍後再試');
+      throw new Error(`檔案上傳失敗：${uploadError.message || '未知錯誤'}`);
     }
 
     // 取得公開 URL
@@ -185,9 +255,21 @@ async function uploadFile(
       .from(bucket)
       .getPublicUrl(fileName);
 
+    console.log(`上傳成功，URL: ${publicUrl}`);
+
+    // 手動回報進度為 100%（完成）
+    onProgress?.(100);
+    
+    // 清除當前上傳控制器
+    currentUploadController = null;
+
     return publicUrl;
   } catch (error) {
-    console.error('Upload failed:', error);
+    console.error('上傳過程出錯:', error);
+    // 確保錯誤時也會清除上傳控制器
+    currentUploadController = null;
+    // 確保錯誤時進度回調會顯示失敗
+    onProgress?.(0);
     throw error;
   }
 }
@@ -199,6 +281,9 @@ export async function openMediaPicker(
   info?: {
     imageInfo?: string;
     videoInfo?: string;
+  },
+  uploadOptions?: {
+    timeout?: number;  // 上傳超時時間（毫秒）
   }
 ): Promise<MediaFile[]> {
   return new Promise((resolve, reject) => {
@@ -247,9 +332,13 @@ export async function openMediaPicker(
       try {
         const mediaFiles = await Promise.all(
           Array.from(input.files).map(async (file) => {
-            const url = await uploadFile(file, (progress) => {
-              onProgress?.(progress, file.name);
-            });
+            const url = await uploadFile(
+              file, 
+              (progress) => {
+                onProgress?.(progress, file.name);
+              },
+              uploadOptions
+            );
 
             return {
               url,
