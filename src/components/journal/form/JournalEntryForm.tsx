@@ -7,6 +7,7 @@ import Toast from '../../shared/Toast';
 import ImageGrid from '../../shared/ImageGrid';
 import CollectDetailSheet from '../../collection/CollectDetailSheet';
 import ImageGallery from '../../shared/ImageGallery';
+import ProgressBar from '../../shared/ProgressBar';
 import { MediaFile } from '../../../types/media';
 import { JournalEntry } from '../../../types/journal';
 import { useNavigate } from 'react-router-dom';
@@ -53,6 +54,10 @@ export default function JournalEntryForm({
   const [uploadStatus, setUploadStatus] = useState<{
     type: 'success' | 'error' | 'loading';
     message: string;
+  } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{
+    progress: number;
+    fileName: string;
   } | null>(null);
   const [error, setError] = useState<string | undefined>(propError);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(-1);
@@ -129,13 +134,42 @@ export default function JournalEntryForm({
     try {
       setUploadStatus({ type: 'loading', message: '上傳中...' });
       setError(undefined);
-      await handleMediaAdd(newMedia);
+      
+      // 處理進度回調
+      const handleProgress = (progress: number, fileName: string) => {
+        setUploadProgress({ progress, fileName });
+        onProgress?.(progress, fileName);
+      };
+      
+      // 如果是單個媒體文件，則直接上傳
+      if (!Array.isArray(newMedia)) {
+        // 直接更新進度狀態
+        handleProgress(0, newMedia.file.name);
+        await handleMediaAdd(newMedia);
+        handleProgress(100, newMedia.file.name);
+      } else {
+        // 如果是多個媒體文件，則逐個處理
+        for (let i = 0; i < newMedia.length; i++) {
+          const media = newMedia[i];
+          handleProgress(0, media.file.name);
+          await handleMediaAdd(media);
+          handleProgress(100, media.file.name);
+        }
+      }
+      
+      // 上傳完成後清空進度狀態
+      setTimeout(() => {
+        setUploadProgress(null);
+      }, 1000);
+      
       setUploadStatus({ type: 'success', message: '上傳成功' });
     } catch (error) {
       console.error('Upload failed:', error);
       const errorMessage = error instanceof Error ? error.message : '上傳失敗，請稍後再試';
       setUploadStatus({ type: 'error', message: errorMessage });
       setError(errorMessage);
+      // 上傳失敗時清空進度狀態
+      setUploadProgress(null);
     }
   };
 
@@ -243,6 +277,7 @@ export default function JournalEntryForm({
                 const index = mediaFiles.findIndex(f => f.url === url);
                 if (index !== -1) setSelectedImageIndex(index);
               }}
+              onDelete={(index) => handleMediaRemove(index)}
               selectedVideo={selectedVideo}
             />
           )}
@@ -302,11 +337,28 @@ export default function JournalEntryForm({
           />
         )}
 
+        {/* Upload Progress Bar */}
+        {uploadProgress && (
+          <div className="fixed left-0 right-0 bottom-16 px-4 z-50">
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200">
+              <ProgressBar 
+                progress={uploadProgress.progress} 
+                fileName={uploadProgress.fileName}
+                type={uploadProgress.progress === 100 ? 'success' : 'primary'} 
+              />
+            </div>
+          </div>
+        )}
+
         {/* Toolbar */}
         <JournalToolbar
           onCollectionClick={() => setIsCollectionSelectorOpen(true)}
-          onPhotoClick={(media) => handleMediaAdd(media)}
-          onCameraClick={(media) => handleMediaAdd(media)}
+          onPhotoClick={(media) => handleMediaUpload(media, (progress, fileName) => {
+            setUploadProgress({ progress, fileName });
+          })}
+          onCameraClick={(media) => handleMediaUpload(media, (progress, fileName) => {
+            setUploadProgress({ progress, fileName });
+          })}
           onLinkClick={url => handleMediaAdd({ url, type: 'image', file: new File([], 'link') })}
         />
 

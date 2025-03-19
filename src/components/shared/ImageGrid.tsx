@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Bookmark, Image as ImageIcon } from 'lucide-react';
+import { Play, Bookmark, Image as ImageIcon, X } from 'lucide-react';
 
 interface ImageGridProps {
   items: Array<{
@@ -15,6 +15,7 @@ interface ImageGridProps {
   onVideoClick?: (url: string) => void;
   onImageClick?: (url: string) => void;
   onCollectClick?: (item: ImageGridProps['items'][0]) => void;
+  onDelete?: (index: number) => void;
   selectedVideo?: string | null;
   maxItems?: number;
 }
@@ -26,6 +27,7 @@ export default function ImageGrid({
   onVideoClick,
   onImageClick,
   onCollectClick,
+  onDelete,
   selectedVideo,
   maxItems
 }: ImageGridProps) {
@@ -147,6 +149,18 @@ export default function ImageGrid({
                 {item.isFromCollect && (
                   <div className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur-sm rounded-full p-1.5">
                     <Bookmark className="w-4 h-4 text-blue-500" />
+                  </div>
+                )}
+
+                {onDelete && (item.type === 'image' || item.type === 'video') && (
+                  <div 
+                    className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur-sm rounded-full p-1.5 hover:bg-white cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(index);
+                    }}
+                  >
+                    <X className="w-4 h-4 text-gray-600" />
                   </div>
                 )}
 
