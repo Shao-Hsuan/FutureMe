@@ -221,7 +221,7 @@ export default function ImageGrid({
                   <div className="w-full h-full flex flex-col bg-white border border-gray-200">
                     {item.linkPreview ? (
                       <>
-                        <div className="link-preview-image-container relative" style={{height: '180px'}}>
+                        <div className="link-preview-image-container relative overflow-hidden" style={{height: item.linkPreview.image ? '100%' : '100%'}}>
                           {item.linkPreview.image ? (
                             <img 
                               src={item.linkPreview.image} 
@@ -233,27 +233,24 @@ export default function ImageGrid({
                                 const container = e.currentTarget.parentElement;
                                 if (container) {
                                   try {
-                                    const domain = new URL(item.url || "").hostname.replace(/^www\./, '');
-                                    const iconClass = item.linkPreview?.type === 'instagram' ? '📸' :
-                                                    item.linkPreview?.type === 'facebook' ? '👍' :
-                                                    item.linkPreview?.type === 'youtube' ? '▶️' :
-                                                    item.linkPreview?.type === 'twitter' ? '🐦' : '🔗';
+                                    const domain = new URL(item.url || item.content || "").hostname.replace(/^www\./, '');
+                                    const iconClass = '🔗';
                                     
                                     container.innerHTML = `
-                                      <div class="flex items-center justify-center h-full bg-gray-100">
-                                        <div class="text-center p-4">
-                                          <div class="text-4xl mb-2">${iconClass}</div>
-                                          <div class="font-medium">${domain}</div>
+                                      <div className="flex items-center justify-center h-full bg-gray-800/70">
+                                        <div className="text-center p-4">
+                                          <div className="text-4xl mb-2">${iconClass}</div>
+                                          <div className="font-medium text-white">${domain}</div>
                                         </div>
                                       </div>
                                     `;
                                   } catch (error) {
                                     console.error('設置備用連結預覽時出錯:', error);
                                     container.innerHTML = `
-                                      <div class="flex items-center justify-center h-full bg-gray-100">
-                                        <div class="text-center">
-                                          <div class="text-4xl mb-2">🔗</div>
-                                          <div class="font-medium">連結預覽</div>
+                                      <div className="flex items-center justify-center h-full bg-gray-800/70">
+                                        <div className="text-center">
+                                          <div className="text-4xl mb-2">🔗</div>
+                                          <div className="font-medium text-white">連結預覽</div>
                                         </div>
                                       </div>
                                     `;
@@ -262,13 +259,13 @@ export default function ImageGrid({
                               }}
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                            <div className="w-full h-full flex items-center justify-center bg-gray-800/70">
                               <div className="text-center">
                                 <div className="text-4xl mb-2">🔗</div>
-                                <div className="font-medium">
+                                <div className="font-medium text-white">
                                   {(() => {
                                     try {
-                                      return new URL(item.url || "").hostname.replace(/^www\./, '');
+                                      return new URL(item.url || item.content || "").hostname.replace(/^www\./, '');
                                     } catch {
                                       return '連結預覽';
                                     }
@@ -277,25 +274,13 @@ export default function ImageGrid({
                               </div>
                             </div>
                           )}
-                        </div>
-                        <div className="p-3">
-                          <h3 className="font-medium text-base mb-1 line-clamp-2">
-                            {item.linkPreview?.title || '未知標題'}
-                          </h3>
-                          {item.linkPreview?.description && (
-                            <p className="text-sm text-gray-500 line-clamp-2">
-                              {item.linkPreview.description}
-                            </p>
+                          {item.linkPreview.title && (
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/70 p-2">
+                              <h3 className="font-medium text-xs text-white line-clamp-2">
+                                {item.linkPreview.title || '未知標題'}
+                              </h3>
+                            </div>
                           )}
-                          <div className="mt-2 text-xs text-gray-400">
-                            {(() => {
-                              try {
-                                return new URL(item.url || "").hostname.replace(/^www\./, '');
-                              } catch {
-                                return item.url;
-                              }
-                            })()}
-                          </div>
                         </div>
                       </>
                     ) : (
@@ -305,9 +290,9 @@ export default function ImageGrid({
                           <div className="text-gray-600 mb-1">
                             {(() => {
                               try {
-                                return new URL(item.url || "").hostname.replace(/^www\./, '');
+                                return new URL(item.url || item.content || "").hostname.replace(/^www\./, '');
                               } catch {
-                                return item.url;
+                                return item.url || item.content;
                               }
                             })()}
                           </div>

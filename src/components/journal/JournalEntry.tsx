@@ -57,7 +57,11 @@ export default function JournalEntry({ entry, onDelete }: JournalEntryProps) {
       url: c.preview_image,
       content: c.content,
       title: c.title,
-      isFromCollect: true
+      isFromCollect: true,
+      linkPreview: {
+        image: c.preview_image,
+        title: c.title
+      }
     })) || []),
     // 文字收藏
     ...(entry.text_collects?.filter(c => c.type === 'text').map(c => ({

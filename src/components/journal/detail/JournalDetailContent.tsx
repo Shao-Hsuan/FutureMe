@@ -46,7 +46,7 @@ export default function JournalDetailContent({ entry }: JournalDetailContentProp
   const attachmentItems = [
     // 媒體檔案
     ...(entry.media_urls || []).map(url => ({
-      type: isVideo(url) ? 'video' : 'image',
+      type: isVideo(url) ? 'video' as const : 'image' as const,
       url,
       content: url,
       isFromCollect: entry.collect_id !== null
@@ -58,29 +58,56 @@ export default function JournalDetailContent({ entry }: JournalDetailContentProp
       content: c.content,
       title: c.title,
       isFromCollect: true,
-      collect: c
+      linkPreview: {
+        image: c.preview_image,
+        title: c.title
+      }
     })) || []),
     // 文字收藏
     ...(entry.text_collects?.filter(c => c.type === 'text').map(c => ({
       type: 'text' as const,
       content: c.content,
       color: c.color,
-      isFromCollect: true,
-      collect: c
+      isFromCollect: true
     })) || [])
   ];
 
+  // 儲存原始的收藏項目，用於在點擊時查找
+  const collectsMap = new Map();
+  entry.text_collects?.forEach(c => {
+    collectsMap.set(c.content, c);
+  });
+
   // 取得所有圖片的 URL
   const imageUrls = attachmentItems
-    .filter(item => item.type === 'image' || (item.type === 'link' && item.url))
-    .map(item => item.url!)
-    .filter(Boolean);
+    .filter(item => {
+      if (item.type === 'image') return true;
+      if (item.type === 'link' && item.url) return true;
+      return false;
+    })
+    .map(item => {
+      if (item.type === 'image' || item.type === 'link') {
+        return item.url;
+      }
+      return undefined;
+    })
+    .filter(Boolean) as string[];
 
   // 處理圖片點擊
   const handleImageClick = (url: string) => {
     const index = imageUrls.indexOf(url);
     if (index !== -1) {
       setSelectedImageIndex(index);
+    }
+  };
+
+  // 處理收藏項目點擊
+  const handleCollectClick = (item: any) => {
+    if (item.type === 'link' || item.type === 'text') {
+      const collect = collectsMap.get(item.content);
+      if (collect) {
+        setSelectedCollect(collect);
+      }
     }
   };
 
@@ -121,7 +148,7 @@ export default function JournalDetailContent({ entry }: JournalDetailContentProp
           gap={4}
           onVideoClick={(url) => setSelectedVideo(url === selectedVideo ? null : url)}
           onImageClick={handleImageClick}
-          onCollectClick={(item) => setSelectedCollect(item.collect)}
+          onCollectClick={handleCollectClick}
           selectedVideo={selectedVideo}
         />
       )}
