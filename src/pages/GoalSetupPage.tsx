@@ -183,6 +183,11 @@ export default function GoalSetupPage() {
           className="w-full p-4 text-lg text-center bg-gray-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
 
+        {/* 上傳卡住提示 */}
+        <p className="mt-2 text-xs text-gray-500 text-center">
+          如果頁面狀態一直卡在上傳中，請嘗試點擊左上角叉叉，或是把 app 滑掉再打開，再重新創一次目標。
+        </p>
+
         {/* Error Message */}
         {error && (
           <div className="mt-4 text-red-500 text-sm bg-red-50 p-3 rounded-lg">
