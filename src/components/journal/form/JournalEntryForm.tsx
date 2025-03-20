@@ -8,7 +8,6 @@ import ImageGrid from '../../shared/ImageGrid';
 import CollectDetailSheet from '../../collection/CollectDetailSheet';
 import ImageGallery from '../../shared/ImageGallery';
 import ProgressBar from '../../shared/ProgressBar';
-import TextCollectGrid from './TextCollectGrid';
 import { MediaFile } from '../../../types/media';
 import { JournalEntry } from '../../../types/journal';
 import { useNavigate } from 'react-router-dom';
@@ -285,9 +284,28 @@ export default function JournalEntryForm({
           
           {/* 顯示文本收藏（包括連結） */}
           {textCollects.length > 0 && (
-            <TextCollectGrid 
-              collects={textCollects}
-              onDelete={handleTextCollectRemove}
+            <ImageGrid 
+              items={[
+                ...textCollects.filter(c => c.type === 'link').map(c => ({
+                  type: 'link' as const,
+                  url: c.preview_image,
+                  content: c.content,
+                  title: c.title,
+                  linkPreview: {
+                    image: c.preview_image,
+                    title: c.title
+                  }
+                })),
+                ...textCollects.filter(c => c.type === 'text').map(c => ({
+                  type: 'text' as const,
+                  content: c.content,
+                  color: c.color
+                }))
+              ]}
+              maxItems={5}
+              aspectRatio={2}
+              gap={4}
+              onDelete={(index) => handleTextCollectRemove(index)}
             />
           )}
           

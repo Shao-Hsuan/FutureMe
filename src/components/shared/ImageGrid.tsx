@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Bookmark, Image as ImageIcon, X } from 'lucide-react';
+import { Play, Image as ImageIcon, X, Link as LinkIcon, Facebook, Instagram, Youtube } from 'lucide-react';
 
 interface ImageGridProps {
   items: Array<{
@@ -157,11 +157,7 @@ export default function ImageGrid({
                 className="relative w-full h-full overflow-hidden rounded-lg bg-gray-100 cursor-pointer"
                 onClick={() => handleItemClick(item)}
               >
-                {item.isFromCollect && (
-                  <div className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur-sm rounded-full p-1.5">
-                    <Bookmark className="w-4 h-4 text-blue-500" />
-                  </div>
-                )}
+                {/* 已移除收藏標誌 */}
 
                 {onDelete && (item.type === 'image' || item.type === 'video') && (
                   <div 
@@ -306,6 +302,31 @@ export default function ImageGrid({
                     <p className="text-gray-800 text-sm line-clamp-4 text-center">
                       {item.content}
                     </p>
+                  </div>
+                )}
+
+                {item.type === 'link' && (
+                  <div className="absolute top-2 left-2 z-10 bg-white/60 backdrop-blur-sm rounded-full p-0.5">
+                    {(() => {
+                      try {
+                        const url = new URL(item.url || item.content || "");
+                        const domain = url.hostname.toLowerCase();
+                        
+                        if (domain.includes('instagram.com') || domain.includes('instagram')) {
+                          return <Instagram className="w-2.5 h-2.5 text-pink-500/80" />;
+                        } else if (domain.includes('facebook.com') || domain.includes('facebook')) {
+                          return <Facebook className="w-2.5 h-2.5 text-blue-600/80" />;
+                        } else if (domain.includes('threads.net') || domain.includes('threads')) {
+                          return <Instagram className="w-2.5 h-2.5 text-black/70" />;
+                        } else if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
+                          return <Youtube className="w-2.5 h-2.5 text-red-600/80" />;
+                        } else {
+                          return <LinkIcon className="w-2.5 h-2.5 text-gray-600/70" />;
+                        }
+                      } catch {
+                        return <LinkIcon className="w-2.5 h-2.5 text-gray-600/70" />;
+                      }
+                    })()}
                   </div>
                 )}
 
