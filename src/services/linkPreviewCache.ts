@@ -102,7 +102,14 @@ export async function cachePreviewData(url: string, data: PeekalinkPreview): Pro
       );
     
     if (error) {
-      console.error('更新資料庫緩存時出錯:', error.message);
+      // 檢查是否是資料表不存在的錯誤
+      if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
+        console.warn('link_preview_cache 資料表不存在，僅使用記憶體緩存');
+        // 仍然記錄錯誤，但使用較低的嚴重性級別
+        console.info('資料表不存在的完整錯誤:', error.message);
+      } else {
+        console.error('更新資料庫緩存時出錯:', error.message);
+      }
     } else {
       console.log('資料庫緩存已更新:', normalizedUrl);
     }
