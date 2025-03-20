@@ -1,341 +1,321 @@
-import { useState } from 'react';
-import { Play, Bookmark, Image as ImageIcon, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { ImageIcon, PlayIcon, Bookmark, X } from 'lucide-react';
 
-interface ImageGridProps {
-  items: Array<{
-    type: 'image' | 'video' | 'text' | 'link';
-    url?: string;
-    content?: string;
+export interface ImageGridItem {
+  type: 'image' | 'video' | 'link';
+  url?: string;
+  content?: string;
+  alt?: string;
+  linkPreview?: {
     title?: string;
-    isFromCollect?: boolean;
-    color?: string;
-    preview?: {
-      image?: string;
-      title?: string;
-      description?: string;
-    };
-    linkPreview?: {
-      image?: string;
-      title?: string;
-      description?: string;
-      type?: string;
-    };
-  }>;
+    description?: string;
+    image?: string;
+    type?: string;
+  };
+  isFromCollect?: boolean;
+}
+
+export interface ImageGridProps {
+  items: ImageGridItem[];
+  maxColumns?: number;
   aspectRatio?: number;
   gap?: number;
-  onVideoClick?: (url: string) => void;
   onImageClick?: (url: string) => void;
-  onCollectClick?: (item: ImageGridProps['items'][0]) => void;
+  onVideoClick?: (url: string) => void;
   onDelete?: (index: number) => void;
-  selectedVideo?: string | null;
-  maxItems?: number;
+  selectedVideo?: string;
 }
 
-export default function ImageGrid({ 
+// 檢查是否為 Instagram 圖片連結
+const isInstagramImage = (url?: string): boolean => {
+  if (!url) return false;
+  return url.includes('instagram.com') && !url.endsWith('.mp4');
+};
+
+export const ImageGrid: React.FC<ImageGridProps> = ({
   items,
-  aspectRatio = 2,
-  gap = 4,
-  onVideoClick,
+  maxColumns = 3,
+  aspectRatio = 1,
+  gap = 2,
   onImageClick,
-  onCollectClick,
+  onVideoClick,
   onDelete,
-  selectedVideo,
-  maxItems
-}: ImageGridProps) {
+  selectedVideo
+}) => {
+  const [selectedVideoState, setSelectedVideo] = useState<string | null>(selectedVideo || null);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
-  const getLayout = (count: number) => {
-    const effectiveCount = maxItems ? Math.min(count, maxItems) : count;
+  const calculateLayout = (itemCount: number, maxColumns: number) => {
+    if (itemCount === 0) return [];
 
-    if (effectiveCount === 1) {
-      return [{ left: 0, top: 0, width: '100%', height: '100%' }];
-    }
-    if (effectiveCount === 2) {
-      return [
-        { left: 0, top: 0, width: '50%', height: '100%' },
-        { left: '50%', top: 0, width: '50%', height: '100%' }
-      ];
-    }
-    if (effectiveCount === 3) {
-      return [
-        { left: 0, top: 0, width: '50%', height: '100%' },
-        { left: '50%', top: 0, width: '50%', height: '50%' },
-        { left: '50%', top: '50%', width: '50%', height: '50%' }
-      ];
-    }
-    if (effectiveCount === 4) {
-      return [
-        { left: 0, top: 0, width: '50%', height: '100%' },
-        { left: '50%', top: 0, width: '25%', height: '50%' },
-        { left: '75%', top: 0, width: '25%', height: '50%' },
-        { left: '50%', top: '50%', width: '50%', height: '50%' }
-      ];
-    }
-    if (maxItems && effectiveCount >= 5) {
-      return [
-        { left: 0, top: 0, width: '50%', height: '100%' },
-        { left: '50%', top: 0, width: '25%', height: '50%' },
-        { left: '75%', top: 0, width: '25%', height: '50%' },
-        { left: '50%', top: '50%', width: '25%', height: '50%' },
-        { left: '75%', top: '50%', width: '25%', height: '50%' }
-      ];
+    let columns = Math.min(maxColumns, itemCount);
+    
+    // 計算每個項目的寬度和高度百分比
+    const itemWidth = 100 / columns;
+    
+    // 計算每行有多少項目
+    const lastRowItemCount = itemCount % columns || columns;
+    const fullRows = Math.floor(itemCount / columns);
+    
+    const positions = [];
+    
+    // 處理完整行
+    for (let row = 0; row < fullRows; row++) {
+      for (let col = 0; col < columns; col++) {
+        const index = row * columns + col;
+        positions[index] = {
+          left: `${col * itemWidth}%`,
+          top: `${row * (100 / aspectRatio)}%`,
+          width: `${itemWidth}%`,
+          height: `${100 / aspectRatio}%`
+        };
+      }
     }
     
-    const rows = Math.ceil(effectiveCount / 2);
-    const rowHeight = `${100 / rows}%`;
-    
-    return Array.from({ length: effectiveCount }).map((_, index) => {
-      const row = Math.floor(index / 2);
-      const col = index % 2;
-      return {
-        left: `${col * 50}%`,
-        top: `${row * (100 / rows)}%`,
-        width: '50%',
-        height: rowHeight
-      };
-    });
-  };
-
-  const layout = getLayout(items.length);
-  const containerStyle = maxItems ? {
-    paddingTop: `${100 / aspectRatio}%`
-  } : {
-    paddingTop: items.length <= 4 ? `${100 / aspectRatio}%` : `${50 * Math.ceil(items.length / 2)}%`
-  };
-
-  const isInstagramImage = (url?: string) => {
-    return url?.includes('cdninstagram.com') || url?.includes('instagram.com');
-  };
-
-  const getBackgroundColor = (color?: string) => {
-    switch (color) {
-      case 'blue': return 'bg-blue-100 hover:bg-blue-200';
-      case 'green': return 'bg-green-100 hover:bg-green-200';
-      case 'yellow': return 'bg-yellow-100 hover:bg-yellow-200';
-      case 'purple': return 'bg-purple-100 hover:bg-purple-200';
-      case 'pink': return 'bg-pink-100 hover:bg-pink-200';
-      default: return 'bg-blue-100 hover:bg-blue-200';
+    // 處理最後一行（可能不是完整行）
+    if (lastRowItemCount < columns && lastRowItemCount > 0) {
+      // 如果最後一行只有一個項目，讓它佔據整行
+      if (lastRowItemCount === 1) {
+        const index = fullRows * columns;
+        positions[index] = {
+          left: '0%',
+          top: `${fullRows * (100 / aspectRatio)}%`,
+          width: '100%',
+          height: `${100 / aspectRatio}%`
+        };
+      } else {
+        // 均勻分佈最後一行的項目
+        const lastRowItemWidth = 100 / lastRowItemCount;
+        for (let col = 0; col < lastRowItemCount; col++) {
+          const index = fullRows * columns + col;
+          positions[index] = {
+            left: `${col * lastRowItemWidth}%`,
+            top: `${fullRows * (100 / aspectRatio)}%`,
+            width: `${lastRowItemWidth}%`,
+            height: `${100 / aspectRatio}%`
+          };
+        }
+      }
     }
+    
+    return positions;
   };
 
-  const handleItemClick = (item: ImageGridProps['items'][0]) => {
-    if (item.isFromCollect && onCollectClick) {
-      onCollectClick(item);
+  const handleItemClick = (item: ImageGridItem) => {
+    if (item.type === 'image' && onImageClick && item.url) {
+      onImageClick(item.url);
     } else if (item.type === 'video' && onVideoClick && item.url) {
       onVideoClick(item.url);
-    } else if ((item.type === 'image' || item.type === 'link') && onImageClick && item.url) {
-      onImageClick(item.url);
+    } else if (item.type === 'link' && item.url) {
+      window.open(item.url, '_blank');
     }
   };
 
+  const positions = calculateLayout(items.length, maxColumns);
+
   return (
-    <div 
-      className="relative w-full overflow-hidden"
-      style={containerStyle}
-    >
-      <div className="absolute inset-0" style={{ gap: `${gap}px` }}>
-        {layout.map((pos, index) => {
-          const item = items[index];
-          if (!item) return null;
+    <div className="relative w-full" style={{ paddingBottom: `${(Math.ceil(items.length / maxColumns) * (100 / aspectRatio))}%` }}>
+      {items.map((item, index) => {
+        const pos = positions[index];
 
-          const showOverlay = maxItems && index === 4 && items.length > 5;
-          const extraCount = items.length - 5;
-
-          return (
-            <div
-              key={index}
-              className="absolute overflow-hidden"
-              style={{
-                left: pos.left,
-                top: pos.top,
-                width: pos.width,
-                height: pos.height,
-                padding: `${gap/2}px`
-              }}
+        return (
+          <div
+            key={index}
+            className="absolute overflow-hidden"
+            style={{
+              left: pos.left,
+              top: pos.top,
+              width: pos.width,
+              height: pos.height,
+              padding: `${gap/2}px`
+            }}
+          >
+            <div 
+              className="relative w-full h-full overflow-hidden rounded-lg bg-gray-100 cursor-pointer"
+              onClick={() => handleItemClick(item)}
             >
-              <div 
-                className="relative w-full h-full overflow-hidden rounded-lg bg-gray-100 cursor-pointer"
-                onClick={() => handleItemClick(item)}
-              >
-                {item.isFromCollect && (
-                  <div className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur-sm rounded-full p-1.5">
-                    <Bookmark className="w-4 h-4 text-blue-500" />
-                  </div>
-                )}
+              {item.isFromCollect && (
+                <div className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur-sm rounded-full p-1.5">
+                  <Bookmark className="w-4 h-4 text-blue-500" />
+                </div>
+              )}
 
-                {onDelete && (item.type === 'image' || item.type === 'video') && (
-                  <div 
-                    className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur-sm rounded-full p-1.5 hover:bg-white cursor-pointer"
+              {onDelete && (item.type === 'image' || item.type === 'video') && (
+                <div 
+                  className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur-sm rounded-full p-1.5 hover:bg-white cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(index);
+                  }}
+                >
+                  <X className="w-4 h-4 text-gray-600" />
+                </div>
+              )}
+
+              {item.type === 'video' ? (
+                selectedVideoState === item.url ? (
+                  <video
+                    src={item.url}
+                    className="w-full h-full object-cover"
+                    controls
+                    autoPlay
                     onClick={(e) => {
                       e.stopPropagation();
-                      onDelete(index);
+                      setSelectedVideo(item.url || null);
                     }}
-                  >
-                    <X className="w-4 h-4 text-gray-600" />
-                  </div>
-                )}
-
-                {item.type === 'video' ? (
-                  selectedVideo === item.url ? (
-                    <video
-                      src={item.url}
-                      className="w-full h-full object-cover"
-                      controls
-                      autoPlay
-                      playsInline
-                    />
-                  ) : (
-                    <div className="relative w-full h-full bg-gray-900">
-                      <video
-                        src={item.url}
-                        className="w-full h-full object-cover opacity-50"
-                        preload="metadata"
-                        playsInline
-                        muted
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                          <Play className="w-6 h-6 text-white" />
-                        </div>
-                      </div>
-                    </div>
-                  )
-                ) : item.type === 'image' ? (
-                  isInstagramImage(item.url) || failedImages.has(item.url || '') ? (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                      <div className="text-center p-4">
-                        <ImageIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                        <p className="text-sm text-gray-500">無法載入圖片</p>
-                      </div>
-                    </div>
-                  ) : (
+                  />
+                ) : (
+                  <div className="relative w-full h-full">
                     <img
-                      src={item.url}
-                      alt=""
+                      src={item.content || '/assets/images/video-thumbnail.jpg'}
+                      alt="video thumbnail"
                       className="w-full h-full object-cover"
-                      onError={() => item.url && setFailedImages(prev => new Set([...prev, item.url!]))}
-                      loading="lazy"
                     />
-                  )
-                ) : item.type === 'link' ? (
-                  <div className="w-full h-full flex flex-col bg-white border border-gray-200">
-                    {item.linkPreview ? (
-                      <>
-                        <div className="link-preview-image-container relative" style={{height: '180px'}}>
-                          {item.linkPreview.image ? (
-                            <img 
-                              src={item.linkPreview.image} 
-                              alt={item.linkPreview.title || '連結預覽'} 
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                // 當圖片無法載入時，顯示純文字+圖標的預覽
-                                const container = e.currentTarget.parentElement;
-                                if (container) {
-                                  try {
-                                    const domain = new URL(item.url || "").hostname.replace(/^www\./, '');
-                                    const iconClass = item.linkPreview?.type === 'instagram' ? '📸' :
-                                                    item.linkPreview?.type === 'facebook' ? '👍' :
-                                                    item.linkPreview?.type === 'youtube' ? '▶️' :
-                                                    item.linkPreview?.type === 'twitter' ? '🐦' : '🔗';
-                                    
-                                    container.innerHTML = `
-                                      <div class="flex items-center justify-center h-full bg-gray-100">
-                                        <div class="text-center p-4">
-                                          <div class="text-4xl mb-2">${iconClass}</div>
-                                          <div class="font-medium">${domain}</div>
-                                        </div>
-                                      </div>
-                                    `;
-                                  } catch (error) {
-                                    console.error('設置備用連結預覽時出錯:', error);
-                                    container.innerHTML = `
-                                      <div class="flex items-center justify-center h-full bg-gray-100">
-                                        <div class="text-center">
-                                          <div class="text-4xl mb-2">🔗</div>
-                                          <div class="font-medium">連結預覽</div>
-                                        </div>
-                                      </div>
-                                    `;
-                                  }
-                                }
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                              <div className="text-center">
-                                <div className="text-4xl mb-2">🔗</div>
-                                <div className="font-medium">
-                                  {(() => {
-                                    try {
-                                      return new URL(item.url || "").hostname.replace(/^www\./, '');
-                                    } catch {
-                                      return '連結預覽';
-                                    }
-                                  })()}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-3">
-                          <h3 className="font-medium text-base mb-1 line-clamp-2">
-                            {item.linkPreview?.title || '未知標題'}
-                          </h3>
-                          {item.linkPreview?.description && (
-                            <p className="text-sm text-gray-500 line-clamp-2">
-                              {item.linkPreview.description}
-                            </p>
-                          )}
-                          <div className="mt-2 text-xs text-gray-400">
-                            {(() => {
-                              try {
-                                return new URL(item.url || "").hostname.replace(/^www\./, '');
-                              } catch {
-                                return item.url;
-                              }
-                            })()}
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-center p-4">
-                          <div className="text-4xl mb-3">🔗</div>
-                          <div className="text-gray-600 mb-1">
-                            {(() => {
-                              try {
-                                return new URL(item.url || "").hostname.replace(/^www\./, '');
-                              } catch {
-                                return item.url;
-                              }
-                            })()}
-                          </div>
-                          <div className="text-sm text-gray-400">點擊查看連結</div>
-                        </div>
-                      </div>
-                    )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                      <PlayIcon className="w-12 h-12 text-white" />
+                    </div>
+                  </div>
+                )
+              ) : item.type === 'image' ? (
+                isInstagramImage(item.url) || failedImages.has(item.url || '') ? (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                    <div className="text-center p-4">
+                      <ImageIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                      <p className="text-sm text-gray-500">無法載入圖片</p>
+                    </div>
                   </div>
                 ) : (
-                  <div className={`w-full h-full p-3 flex items-center justify-center ${getBackgroundColor(item.color)}`}>
-                    <p className="text-gray-800 text-sm line-clamp-4 text-center">
-                      {item.content}
-                    </p>
-                  </div>
-                )}
-
-                {showOverlay && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <span className="text-white text-xl font-medium">
-                      +{extraCount}
-                    </span>
-                  </div>
-                )}
-              </div>
+                  <img
+                    src={item.url}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    onError={() => item.url && setFailedImages(prev => new Set([...prev, item.url!]))}
+                    loading="lazy"
+                  />
+                )
+              ) : item.type === 'link' ? (
+                <div className="w-full h-full flex flex-col bg-white border border-gray-200">
+                  {item.linkPreview ? (
+                    <div className="w-full h-full">
+                      {/* 處理連結預覽 */}
+                      {item.linkPreview.image && (
+                        <div className="w-full h-2/3 bg-gray-100 overflow-hidden relative">
+                          <img 
+                            src={item.linkPreview.image} 
+                            alt={item.linkPreview.title || '連結預覽'} 
+                            className="w-full h-full object-cover"
+                            onLoad={() => console.log('連結預覽圖片載入成功:', item.linkPreview?.image)}
+                            onError={(event) => {
+                              console.error('連結預覽圖片載入失敗:', item.linkPreview?.image);
+                              // 隱藏失敗的圖片
+                              event.currentTarget.style.display = 'none';
+                              
+                              // 顯示備用圖示
+                              const fallbackIcon = event.currentTarget.parentElement?.querySelector('.fallback-icon');
+                              if (fallbackIcon) {
+                                fallbackIcon.classList.remove('hidden');
+                              }
+                            }}
+                          />
+                          
+                          {/* 偵錯信息 */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 overflow-auto max-h-20">
+                            類型: {item.linkPreview.type || '未知'} | 
+                            URL: {item.url?.substring(0, 20)}...
+                          </div>
+                          
+                          {/* 社交媒體平台圖標 */}
+                          {item.linkPreview.type === 'instagram' && (
+                            <img 
+                              src={window.location.origin + '/assets/images/instagram-logo.png'} 
+                              alt="Instagram" 
+                              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white p-1"
+                              onError={() => console.error('Instagram 圖標載入失敗')}
+                            />
+                          )}
+                          
+                          {item.linkPreview.type === 'facebook' && (
+                            <img 
+                              src={window.location.origin + '/assets/images/facebook-logo.png'} 
+                              alt="Facebook" 
+                              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white p-1"
+                              onError={() => console.error('Facebook 圖標載入失敗')}
+                            />
+                          )}
+                          
+                          {/* 備用圖示，當圖片載入失敗時顯示 */}
+                          <div className="fallback-icon hidden absolute inset-0 flex items-center justify-center bg-gray-100">
+                            <Bookmark className="w-10 h-10 text-gray-400" />
+                          </div>
+                        </div>
+                      )}
+                      
+                      {!item.linkPreview.image && (
+                        <div className="w-full h-2/3 bg-gray-100 flex items-center justify-center">
+                          <div className="text-center">
+                            {item.linkPreview.type === 'instagram' ? (
+                              <img 
+                                src={window.location.origin + '/assets/images/instagram-logo.png'} 
+                                alt="Instagram" 
+                                className="w-12 h-12 mx-auto" 
+                                onError={() => console.error('Instagram 備用圖標載入失敗')}
+                              />
+                            ) : item.linkPreview.type === 'facebook' ? (
+                              <img 
+                                src={window.location.origin + '/assets/images/facebook-logo.png'} 
+                                alt="Facebook" 
+                                className="w-12 h-12 mx-auto" 
+                                onError={() => console.error('Facebook 備用圖標載入失敗')}
+                              />
+                            ) : (
+                              <Bookmark className="w-10 h-10 text-gray-400 mx-auto" />
+                            )}
+                            <p className="mt-2 text-sm text-gray-500">
+                              {item.linkPreview.type || '連結'}預覽
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      <div className="p-3 flex-1 flex flex-col">
+                        <h3 className="text-sm font-medium line-clamp-1">{item.linkPreview.title || '無標題'}</h3>
+                        {item.linkPreview.description && (
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.linkPreview.description}</p>
+                        )}
+                        {item.url && (
+                          <p className="text-xs text-gray-400 mt-auto line-clamp-1">
+                            {(() => {
+                              try {
+                                return new URL(item.url).hostname.replace(/^www\./, '');
+                              } catch {
+                                return item.url;
+                              }
+                            })()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                      <div className="text-center">
+                        <div className="text-4xl mb-2">🔗</div>
+                        <div className="font-medium">
+                          {(() => {
+                            try {
+                              return new URL(item.url || "").hostname.replace(/^www\./, '');
+                            } catch {
+                              return item.url || '連結';
+                            }
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
-          );
-        })}
-      </div>
+          </div>
+        );
+      })}
     </div>
   );
-}
+};

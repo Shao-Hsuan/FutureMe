@@ -8,6 +8,12 @@ export interface MediaFile {
     image?: string | undefined;
     description?: string | undefined;
   };
+  linkPreview?: {    // 添加新格式的連結預覽數據
+    title?: string;
+    image?: string | undefined;
+    description?: string | undefined;
+    type?: string;
+  };
 }
 
 export interface MediaUploadOptions {

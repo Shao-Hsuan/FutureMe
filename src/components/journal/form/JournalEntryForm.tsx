@@ -4,7 +4,7 @@ import JournalToolbar from '../JournalToolbar';
 import DatePicker from '../../shared/DatePicker';
 import CollectionSelectorSheet from '../CollectionSelectorSheet';
 import Toast from '../../shared/Toast';
-import ImageGrid from '../../shared/ImageGrid';
+import { ImageGrid } from '../../shared/ImageGrid';
 import CollectDetailSheet from '../../collection/CollectDetailSheet';
 import ImageGallery from '../../shared/ImageGallery';
 import ProgressBar from '../../shared/ProgressBar';
@@ -13,6 +13,7 @@ import { MediaFile } from '../../../types/media';
 import { JournalEntry } from '../../../types/journal';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../services/supabase';
+import { getLinkPreview } from '../../../services/collectService';
 
 interface JournalEntryFormProps {
   initialEntry?: JournalEntry;
@@ -62,9 +63,12 @@ export default function JournalEntryForm({
   } | null>(null);
   const [error, setError] = useState<string | undefined>(propError);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(-1);
-  const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [selectedCollect, setSelectedCollect] = useState<any>(null);
   const [letter, setLetter] = useState<any>(null);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [isLoadingLink, setIsLoadingLink] = useState(false);
+  const [linkError, setLinkError] = useState('');
 
   useEffect(() => {
     setError(propError);
@@ -203,6 +207,89 @@ export default function JournalEntryForm({
     setMediaFiles(prev => [...prev, ...newMediaFiles]);
   };
 
+  const onLinkClick = async () => {
+    setShowLinkInput(true);
+    console.log("連結輸入框已顯示");
+  };
+
+  const handleAddLink = async () => {
+    if (!linkUrl.trim()) {
+      console.error("沒有輸入URL");
+      return;
+    }
+
+    // 基本URL驗證
+    let processedUrl = linkUrl.trim();
+    if (!processedUrl.match(/^https?:\/\//i)) {
+      processedUrl = 'https://' + processedUrl;
+      console.log("已自動添加https前綴:", processedUrl);
+    }
+
+    // 使用URL對象驗證
+    try {
+      new URL(processedUrl);
+    } catch (e) {
+      setLinkError('請輸入有效的URL');
+      console.error("無效的URL格式:", e);
+      return;
+    }
+
+    // 記錄連結處理開始
+    console.log("開始處理連結:", processedUrl);
+    setIsLoadingLink(true);
+    setLinkError('');
+    setUploadStatus({ type: 'loading', message: '取得連結預覽中...' });
+
+    try {
+      // 獲取連結預覽
+      const preview = await getLinkPreview(processedUrl);
+      console.log("獲取到連結預覽詳細數據:", JSON.stringify(preview));
+
+      if (preview) {
+        // 轉換 image 屬性，將 null 轉為 undefined 以符合 MediaFile 類型要求
+        const mediaLinkPreview = {
+          ...preview,
+          image: preview.image || undefined,
+          description: preview.description || undefined
+        };
+        console.log("轉換後的連結預覽數據:", JSON.stringify(mediaLinkPreview));
+
+        // 添加到媒體文件列表
+        const newMediaFile: MediaFile = {
+          type: 'link' as 'link',
+          url: processedUrl,
+          linkPreview: mediaLinkPreview,
+          file: new File([], 'link') // 添加空的 File 對象以符合 MediaFile 接口要求
+        };
+        console.log("最終添加的連結媒體對象:", JSON.stringify({
+          type: newMediaFile.type,
+          url: newMediaFile.url,
+          linkPreview: newMediaFile.linkPreview
+        }));
+        
+        setMediaFiles(prev => {
+          const updated = [...prev, newMediaFile];
+          console.log("更新後的媒體文件數量:", updated.length);
+          return updated;
+        });
+        
+        setLinkUrl('');
+        setShowLinkInput(false);
+        setUploadStatus({ type: 'success', message: '連結新增成功' });
+      } else {
+        setLinkError('無法獲取連結預覽');
+        console.error("連結預覽獲取失敗: 返回數據為空");
+        setUploadStatus({ type: 'error', message: '無法獲取連結預覽' });
+      }
+    } catch (error) {
+      console.error("連結處理過程中出錯:", error);
+      setLinkError('連結處理失敗');
+      setUploadStatus({ type: 'error', message: '連結處理失敗' });
+    } finally {
+      setIsLoadingLink(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-white z-50 flex flex-col">
       {/* Header */}
@@ -216,7 +303,17 @@ export default function JournalEntryForm({
         </button>
         <DatePicker date={date} onChange={setDate} />
         <button
-          onClick={handleSave}
+          onClick={() => {
+            if (mediaFiles.length > 0) {
+              console.log("提交前的媒體文件:", mediaFiles.map(file => ({
+                type: file.type,
+                url: file.url,
+                hasLinkPreview: !!file.linkPreview,
+                previewType: file.linkPreview?.type
+              })));
+            }
+            handleSave();
+          }}
           disabled={isSaving}
           className={`text-blue-500 hover:text-blue-600 disabled:opacity-50 ${
             isSaving ? 'cursor-not-allowed' : 'cursor-pointer'
@@ -269,17 +366,20 @@ export default function JournalEntryForm({
               items={mediaFiles.map(file => ({
                 type: file.type,
                 url: file.url,
-                content: file.url
+                content: file.url,
+                linkPreview: file.linkPreview
               }))}
               aspectRatio={2}
               gap={4}
-              onVideoClick={(url) => setSelectedVideo(url === selectedVideo ? null : url)}
-              onImageClick={(url) => {
+              onVideoClick={(url: string) => {
+                console.log('播放影片:', url);
+                // 這裡可以實現影片播放邏輯
+              }}
+              onImageClick={(url: string) => {
                 const index = mediaFiles.findIndex(f => f.url === url);
                 if (index !== -1) setSelectedImageIndex(index);
               }}
-              onDelete={(index) => handleMediaRemove(index)}
-              selectedVideo={selectedVideo}
+              onDelete={(index: number) => handleMediaRemove(index)}
             />
           )}
           
@@ -368,60 +468,37 @@ export default function JournalEntryForm({
           onCameraClick={(media) => handleMediaUpload(media, (progress, fileName) => {
             setUploadProgress({ progress, fileName });
           })}
-          onLinkClick={async (url) => {
-            try {
-              setUploadStatus({ type: 'loading', message: '取得連結預覽中...' });
-              try {
-                const { getLinkPreview } = await import('../../../services/collectService');
-                const previewData = await getLinkPreview(url);
-                
-                const linkMedia: MediaFile = {
-                  url: url,
-                  type: 'link' as const,
-                  preview: {
-                    title: previewData?.title || url,
-                    image: previewData?.image || undefined,
-                    description: previewData?.description || undefined
-                  },
-                  file: new File([], 'link')
-                };
-                
-                setMediaFiles(prev => [...prev, linkMedia]);
-                setUploadStatus({ type: 'success', message: '連結新增成功' });
-              } catch (importError) {
-                console.error('導入模組失敗:', importError);
-                setUploadStatus({ type: 'error', message: '連結處理失敗' });
-                
-                const basicLinkMedia: MediaFile = {
-                  url: url,
-                  type: 'link' as const,
-                  preview: {
-                    title: url,
-                    image: undefined,
-                    description: undefined
-                  },
-                  file: new File([], 'link')
-                };
-                setMediaFiles(prev => [...prev, basicLinkMedia]);
-              }
-            } catch (error) {
-              console.error('連結預覽獲取失敗:', error);
-              setUploadStatus({ type: 'error', message: '連結預覽獲取失敗' });
-              
-              const basicLinkMedia: MediaFile = {
-                url: url,
-                type: 'link' as const,
-                preview: {
-                  title: url,
-                  image: undefined,
-                  description: undefined
-                },
-                file: new File([], 'link')
-              };
-              setMediaFiles(prev => [...prev, basicLinkMedia]);
-            }
-          }}
+          onLinkClick={onLinkClick}
         />
+
+        {/* 連結輸入框 */}
+        {showLinkInput && (
+          <div className="fixed left-0 right-0 bottom-16 px-4 z-50">
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-4">
+              <input 
+                type="text" 
+                value={linkUrl} 
+                onChange={(e) => setLinkUrl(e.target.value)} 
+                placeholder="輸入連結" 
+                className="w-full focus:outline-none"
+              />
+              {linkError && (
+                <div className="text-red-600 text-sm mt-2">
+                  {linkError}
+                </div>
+              )}
+              <button 
+                onClick={handleAddLink} 
+                disabled={isLoadingLink} 
+                className={`text-blue-500 hover:text-blue-600 disabled:opacity-50 ${
+                  isLoadingLink ? 'cursor-not-allowed' : 'cursor-pointer'
+                }`}
+              >
+                {isLoadingLink ? '處理中...' : '添加連結'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Collection Selector */}
         <CollectionSelectorSheet

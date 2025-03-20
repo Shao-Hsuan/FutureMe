@@ -112,12 +112,13 @@ const LinkPreview = ({ url, preview, onLinkPreviewLoaded, onLoad, onError }: Lin
 
   const getSocialMediaDefaultImage = () => {
     const platform = getSocialMediaIcon();
+    const baseUrl = window.location.origin;
     
     switch (platform) {
       case 'instagram':
-        return '/assets/images/instagram-logo.png';
+        return `${baseUrl}/assets/images/instagram-logo.png`;
       case 'facebook':
-        return '/assets/images/facebook-logo.png';
+        return `${baseUrl}/assets/images/facebook-logo.png`;
       case 'twitter':
         return 'https://abs.twimg.com/responsive-web/web/icon-default.604e2486a34a2f6e1.png';
       case 'linkedin':

@@ -1,6 +1,5 @@
 import { BookMarked, Camera, Image, Link } from 'lucide-react';
 import { openCamera, openMediaPicker } from '../../services/mediaService';
-import { handleLinkInput } from '../../services/linkService';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 import ToolbarButton from '../shared/ToolbarButton';
 import { MediaFile } from '../../types/media';
@@ -51,10 +50,10 @@ export default function JournalToolbar({
     { 
       icon: Link, 
       label: '連結', 
-      onClick: () => handleAction(async () => {
-        const url = await handleLinkInput();
-        onLinkClick(url);
-      })
+      onClick: () => {
+        console.log("連結按鈕被點擊");
+        onLinkClick(''); // 直接調用 onLinkClick 而不傳入 URL，讓 JournalEntryForm 處理連結輸入
+      }
     },
   ];
 

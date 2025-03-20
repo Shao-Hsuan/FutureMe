@@ -34,9 +34,19 @@ export async function handleLinkInput(): Promise<string> {
   if (!url) throw new UserCancelError();
   
   try {
-    new URL(url); // Validate URL format
-    return url;
-  } catch {
+    console.log("連結輸入處理:", url);
+    // 確保 URL 格式正確
+    let processedUrl = url.trim();
+    if (!processedUrl.match(/^https?:\/\//i)) {
+      processedUrl = 'https://' + processedUrl;
+      console.log("已自動添加https前綴:", processedUrl);
+    }
+    
+    // 驗證URL
+    new URL(processedUrl);
+    return processedUrl;
+  } catch (error) {
+    console.error("無效的連結格式:", error);
     throw new Error('無效的連結格式');
   }
 }
