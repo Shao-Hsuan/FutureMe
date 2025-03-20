@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TabBar from './components/layout/TabBar';
 import CollectionPage from './pages/CollectionPage';
 import JournalPage from './pages/JournalPage';
@@ -17,9 +17,18 @@ import UsageGuideSheet from './components/settings/UsageGuideSheet';
 import GlobalLoading from './components/shared/GlobalLoading';
 import { supabase } from './services/supabase';
 import { LinkPreviewExample } from './examples/LinkPreviewExample';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   const [showGuide, setShowGuide] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    // 簡單的應用程序加載指示器
+    setTimeout(() => {
+      setIsReady(true);
+    }, 500);
+  }, []);
 
   const handleGuideClose = async () => {
     try {
@@ -39,43 +48,56 @@ function App() {
     setShowGuide(false);
   };
 
+  if (!isReady) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">應用程序載入中...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Router>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/auth" element={<AuthForm />} />
-        
-        {/* Protected routes */}
-        <Route element={<AuthRequired onFirstLogin={() => setShowGuide(true)} />}>
-          {/* Goal setup and welcome routes - no TabBar */}
-          <Route path="/goal-setup" element={<GoalSetupPage />} />
-          <Route path="/welcome" element={<WelcomePage />} />
+    <ErrorBoundary>
+      <Router>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/auth" element={<AuthForm />} />
           
-          {/* Main app routes (with TabBar) */}
-          <Route element={
-            <div className="min-h-screen bg-gray-50 pb-16">
-              <Outlet />
-              <TabBar />
-            </div>
-          }>
-            <Route path="/" element={<Navigate to="/journal" replace />} />
-            <Route path="/journal" element={<JournalPage />} />
-            <Route path="/journal/new" element={<JournalNewPage />} />
-            <Route path="/collection" element={<CollectionPage />} />
-            <Route path="/future-me" element={<FutureMePage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/link-preview-demo" element={<LinkPreviewExample />} />
+          {/* Protected routes */}
+          <Route element={<AuthRequired onFirstLogin={() => setShowGuide(true)} />}>
+            {/* Goal setup and welcome routes - no TabBar */}
+            <Route path="/goal-setup" element={<GoalSetupPage />} />
+            <Route path="/welcome" element={<WelcomePage />} />
+            
+            {/* Main app routes (with TabBar) */}
+            <Route element={
+              <div className="min-h-screen bg-gray-50 pb-16">
+                <Outlet />
+                <TabBar />
+              </div>
+            }>
+              <Route path="/" element={<Navigate to="/journal" replace />} />
+              <Route path="/journal" element={<JournalPage />} />
+              <Route path="/journal/new" element={<JournalNewPage />} />
+              <Route path="/collection" element={<CollectionPage />} />
+              <Route path="/future-me" element={<FutureMePage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/link-preview-demo" element={<LinkPreviewExample />} />
+            </Route>
+            
+            {/* Detail pages (without TabBar) */}
+            <Route path="/journal/:id" element={<JournalDetailPage />} />
+            <Route path="/journal/:id/edit" element={<JournalEditPage />} />
+            <Route path="/future-me/:id" element={<LetterDetailPage />} />
           </Route>
-          
-          {/* Detail pages (without TabBar) */}
-          <Route path="/journal/:id" element={<JournalDetailPage />} />
-          <Route path="/journal/:id/edit" element={<JournalEditPage />} />
-          <Route path="/future-me/:id" element={<LetterDetailPage />} />
-        </Route>
-      </Routes>
-      <UsageGuideSheet isOpen={showGuide} onClose={handleGuideClose} />
-      <GlobalLoading />
-    </Router>
+        </Routes>
+        <UsageGuideSheet isOpen={showGuide} onClose={handleGuideClose} />
+        <GlobalLoading />
+      </Router>
+    </ErrorBoundary>
   );
 }
 

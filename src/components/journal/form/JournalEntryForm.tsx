@@ -368,7 +368,59 @@ export default function JournalEntryForm({
           onCameraClick={(media) => handleMediaUpload(media, (progress, fileName) => {
             setUploadProgress({ progress, fileName });
           })}
-          onLinkClick={url => handleMediaAdd({ url, type: 'image', file: new File([], 'link') })}
+          onLinkClick={async (url) => {
+            try {
+              setUploadStatus({ type: 'loading', message: '取得連結預覽中...' });
+              try {
+                const { getLinkPreview } = await import('../../../services/collectService');
+                const previewData = await getLinkPreview(url);
+                
+                const linkMedia: MediaFile = {
+                  url: url,
+                  type: 'link' as const,
+                  preview: {
+                    title: previewData?.title || url,
+                    image: previewData?.image || undefined,
+                    description: previewData?.description || undefined
+                  },
+                  file: new File([], 'link')
+                };
+                
+                setMediaFiles(prev => [...prev, linkMedia]);
+                setUploadStatus({ type: 'success', message: '連結新增成功' });
+              } catch (importError) {
+                console.error('導入模組失敗:', importError);
+                setUploadStatus({ type: 'error', message: '連結處理失敗' });
+                
+                const basicLinkMedia: MediaFile = {
+                  url: url,
+                  type: 'link' as const,
+                  preview: {
+                    title: url,
+                    image: undefined,
+                    description: undefined
+                  },
+                  file: new File([], 'link')
+                };
+                setMediaFiles(prev => [...prev, basicLinkMedia]);
+              }
+            } catch (error) {
+              console.error('連結預覽獲取失敗:', error);
+              setUploadStatus({ type: 'error', message: '連結預覽獲取失敗' });
+              
+              const basicLinkMedia: MediaFile = {
+                url: url,
+                type: 'link' as const,
+                preview: {
+                  title: url,
+                  image: undefined,
+                  description: undefined
+                },
+                file: new File([], 'link')
+              };
+              setMediaFiles(prev => [...prev, basicLinkMedia]);
+            }
+          }}
         />
 
         {/* Collection Selector */}

@@ -16,7 +16,7 @@ type PreviewData = {
   image: string | null;
   description: string | null;
   url: string;
-  type: 'link' | 'youtube' | 'instagram' | 'facebook';
+  type: 'link' | 'youtube' | 'instagram' | 'facebook' | 'pinterest' | 'behance';
   videoId?: string;
   siteName?: string; // Open Graph site_name
   ogType?: string;   // Open Graph type
@@ -44,16 +44,25 @@ const LinkPreview: React.FC<LinkPreviewProps> = ({
     setImageError(false);
     setPreview(null);
     
+    // 追蹤組件是否已卸載
+    let isMounted = true;
+    
     const fetchPreview = async () => {
       try {
-        // 獲取連結預覽資料
+        // 調用collectService的getLinkPreview，共享緩存機制
         const data = await getLinkPreview(url);
-        setPreview(data);
+        if (isMounted) {
+          setPreview(data);
+        }
       } catch (err) {
         console.error('連結預覽獲取失敗:', err);
-        setError('暫時無法生成預覽');
+        if (isMounted) {
+          setError('暫時無法生成預覽');
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -63,6 +72,11 @@ const LinkPreview: React.FC<LinkPreviewProps> = ({
       setIsLoading(false);
       setError('無效的連結');
     }
+    
+    // 清理函數
+    return () => {
+      isMounted = false;
+    };
   }, [url]);
 
   // 根據連結類型返回適當的圖標
@@ -84,6 +98,18 @@ const LinkPreview: React.FC<LinkPreviewProps> = ({
         return (
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#1877F2" stroke="none">
             <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+          </svg>
+        );
+      case 'pinterest':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#E60023" stroke="none">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-4-6v-2h8v2h-8z"/>
+          </svg>
+        );
+      case 'behance':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#053eff" stroke="none">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-4-6v-2h8v2h-8z"/>
           </svg>
         );
       default:

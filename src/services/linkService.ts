@@ -1,5 +1,5 @@
 import { UserCancelError } from '../utils/error';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { getCachedPreview, cachePreviewData, clearCache } from './linkPreviewCache';
 
 // Peekalink 預覽介面定義
@@ -45,9 +45,19 @@ export async function handleLinkInput(): Promise<string> {
  * 獲取連結預覽信息，優先使用緩存數據
  * @param url 要獲取預覽的URL
  * @param forceRefresh 是否強制刷新緩存
+ * @param retryCount 重試次數
  * @returns 連結預覽數據
  */
-export async function getLinkPreview(url: string, forceRefresh = false): Promise<PeekalinkPreview | null> {
+export async function getLinkPreview(
+  url: string, 
+  forceRefresh = false, 
+  retryCount = 0
+): Promise<PeekalinkPreview | null> {
+  // 最大重試次數
+  const MAX_RETRIES = 3;
+  // 重試延遲（毫秒），指數增長
+  const RETRY_DELAY = 1000 * Math.pow(2, retryCount);
+  
   // 檢查URL格式
   try {
     new URL(url);
@@ -73,7 +83,7 @@ export async function getLinkPreview(url: string, forceRefresh = false): Promise
       return null;
     }
 
-    console.log('從API獲取連結預覽:', url);
+    console.log(`從API獲取連結預覽 (嘗試 ${retryCount + 1}/${MAX_RETRIES + 1}):`, url);
     const response = await axios.post(
       'https://api.peekalink.io/',
       { link: url },
@@ -94,7 +104,30 @@ export async function getLinkPreview(url: string, forceRefresh = false): Promise
     
     return null;
   } catch (error) {
-    console.error('獲取連結預覽時出錯:', error);
+    const axiosError = error as AxiosError;
+    
+    // 檢查是否可以重試
+    const canRetry = retryCount < MAX_RETRIES;
+    const shouldRetry = canRetry && (
+      // 網絡錯誤或服務器錯誤（5xx）可以重試
+      !axiosError.response || 
+      (axiosError.response && axiosError.response.status >= 500) ||
+      // 超時錯誤可以重試
+      axiosError.code === 'ECONNABORTED'
+    );
+    
+    if (shouldRetry) {
+      console.log(`連結預覽獲取失敗，準備重試 (${retryCount + 1}/${MAX_RETRIES})`, error);
+      
+      // 等待一段時間後重試
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      
+      // 遞迴調用，增加重試計數
+      return getLinkPreview(url, forceRefresh, retryCount + 1);
+    }
+    
+    // 已達最大重試次數或不應重試的錯誤
+    console.error('獲取連結預覽時出錯，放棄重試:', error);
     return null;
   }
 }

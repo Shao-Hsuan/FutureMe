@@ -26,15 +26,22 @@ BEFORE UPDATE ON link_preview_cache
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
--- 添加定期清理過期緩存的函數（可選）
-CREATE OR REPLACE FUNCTION clean_expired_link_previews()
-RETURNS void AS $$
+-- 創建清理過期緩存的函數（30天後自動清理）
+CREATE OR REPLACE FUNCTION clean_expired_link_preview_cache()
+RETURNS integer
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  deleted_count integer;
 BEGIN
   DELETE FROM link_preview_cache
-  WHERE updated_at < TIMEZONE('utc', now()) - INTERVAL '7 days';
+  WHERE updated_at < TIMEZONE('utc', now()) - INTERVAL '30 days';
+  
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  RETURN deleted_count;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- 注意：如果需要定期運行清理，可以設置一個cron任務或使用Supabase的Edge Functions
 -- 以下是手動運行清理的示例
--- SELECT clean_expired_link_previews();
+-- SELECT clean_expired_link_preview_cache();

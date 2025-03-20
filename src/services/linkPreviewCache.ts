@@ -13,7 +13,7 @@ interface LinkPreviewCacheRecord {
 // 記憶體緩存 - 減少資料庫請求
 const memoryCache: Map<string, { data: PeekalinkPreview; timestamp: number }> = new Map();
 const MEMORY_CACHE_EXPIRATION = 15 * 60 * 1000; // 15分鐘的記憶體緩存
-const DB_CACHE_EXPIRATION = 7 * 24 * 60 * 60 * 1000; // 7天的資料庫緩存
+const DB_CACHE_EXPIRATION = 30 * 24 * 60 * 60 * 1000; // 30天的資料庫緩存
 
 /**
  * 從緩存中獲取連結預覽資料

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LinkPreview } from './LinkPreview';
+import LinkPreview from './LinkPreview';
 import { PeekalinkPreview } from '../../services/linkService';
 
 interface LinkPreviewCardProps {

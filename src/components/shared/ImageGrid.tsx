@@ -9,6 +9,17 @@ interface ImageGridProps {
     title?: string;
     isFromCollect?: boolean;
     color?: string;
+    preview?: {
+      image?: string;
+      title?: string;
+      description?: string;
+    };
+    linkPreview?: {
+      image?: string;
+      title?: string;
+      description?: string;
+      type?: string;
+    };
   }>;
   aspectRatio?: number;
   gap?: number;
@@ -189,7 +200,7 @@ export default function ImageGrid({
                       </div>
                     </div>
                   )
-                ) : item.type === 'image' || item.type === 'link' ? (
+                ) : item.type === 'image' ? (
                   isInstagramImage(item.url) || failedImages.has(item.url || '') ? (
                     <div className="w-full h-full flex items-center justify-center bg-gray-100">
                       <div className="text-center p-4">
@@ -206,6 +217,105 @@ export default function ImageGrid({
                       loading="lazy"
                     />
                   )
+                ) : item.type === 'link' ? (
+                  <div className="w-full h-full flex flex-col bg-white border border-gray-200">
+                    {item.linkPreview ? (
+                      <>
+                        <div className="link-preview-image-container relative" style={{height: '180px'}}>
+                          {item.linkPreview.image ? (
+                            <img 
+                              src={item.linkPreview.image} 
+                              alt={item.linkPreview.title || '連結預覽'} 
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                // 當圖片無法載入時，顯示純文字+圖標的預覽
+                                const container = e.currentTarget.parentElement;
+                                if (container) {
+                                  try {
+                                    const domain = new URL(item.url || "").hostname.replace(/^www\./, '');
+                                    const iconClass = item.linkPreview?.type === 'instagram' ? '📸' :
+                                                    item.linkPreview?.type === 'facebook' ? '👍' :
+                                                    item.linkPreview?.type === 'youtube' ? '▶️' :
+                                                    item.linkPreview?.type === 'twitter' ? '🐦' : '🔗';
+                                    
+                                    container.innerHTML = `
+                                      <div class="flex items-center justify-center h-full bg-gray-100">
+                                        <div class="text-center p-4">
+                                          <div class="text-4xl mb-2">${iconClass}</div>
+                                          <div class="font-medium">${domain}</div>
+                                        </div>
+                                      </div>
+                                    `;
+                                  } catch (error) {
+                                    console.error('設置備用連結預覽時出錯:', error);
+                                    container.innerHTML = `
+                                      <div class="flex items-center justify-center h-full bg-gray-100">
+                                        <div class="text-center">
+                                          <div class="text-4xl mb-2">🔗</div>
+                                          <div class="font-medium">連結預覽</div>
+                                        </div>
+                                      </div>
+                                    `;
+                                  }
+                                }
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                              <div className="text-center">
+                                <div className="text-4xl mb-2">🔗</div>
+                                <div className="font-medium">
+                                  {(() => {
+                                    try {
+                                      return new URL(item.url || "").hostname.replace(/^www\./, '');
+                                    } catch {
+                                      return '連結預覽';
+                                    }
+                                  })()}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-3">
+                          <h3 className="font-medium text-base mb-1 line-clamp-2">
+                            {item.linkPreview?.title || '未知標題'}
+                          </h3>
+                          {item.linkPreview?.description && (
+                            <p className="text-sm text-gray-500 line-clamp-2">
+                              {item.linkPreview.description}
+                            </p>
+                          )}
+                          <div className="mt-2 text-xs text-gray-400">
+                            {(() => {
+                              try {
+                                return new URL(item.url || "").hostname.replace(/^www\./, '');
+                              } catch {
+                                return item.url;
+                              }
+                            })()}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-center p-4">
+                          <div className="text-4xl mb-3">🔗</div>
+                          <div className="text-gray-600 mb-1">
+                            {(() => {
+                              try {
+                                return new URL(item.url || "").hostname.replace(/^www\./, '');
+                              } catch {
+                                return item.url;
+                              }
+                            })()}
+                          </div>
+                          <div className="text-sm text-gray-400">點擊查看連結</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className={`w-full h-full p-3 flex items-center justify-center ${getBackgroundColor(item.color)}`}>
                     <p className="text-gray-800 text-sm line-clamp-4 text-center">

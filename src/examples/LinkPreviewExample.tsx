@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { LinkPreview, LinkPreviewEditor, LinkPreviewCard } from '../components/LinkPreview';
+// 直接從路徑導入每個組件，避免使用索引文件
+import LinkPreview from '../components/LinkPreview/LinkPreview';
+import { LinkPreviewCard } from '../components/LinkPreview/LinkPreviewCard';
+import { LinkPreviewEditor } from '../components/LinkPreview/LinkPreviewEditor';
 
 // 示例收藏連結類型
 interface SavedLink {

@@ -1,63 +1,94 @@
-import React, { useEffect, useState } from 'react';
-import { getLinkPreview, PeekalinkPreview } from '../../services/linkService';
+import { useEffect, useState } from 'react';
+import { PeekalinkPreview } from '../../services/linkService';
+import { getLinkPreview as getCollectLinkPreview } from '../../services/collectService';
 
 interface LinkPreviewProps {
   url: string;
-  className?: string;
-  onLoad?: (preview: PeekalinkPreview) => void;
-  onError?: (error: Error) => void;
+  preview?: PeekalinkPreview;
+  onClose?: () => void;
+  onLinkPreviewLoaded?: (preview: PeekalinkPreview) => void;
+  onLoad?: (preview: PeekalinkPreview) => void; 
+  onError?: () => void; 
 }
 
-export const LinkPreview: React.FC<LinkPreviewProps> = ({
-  url,
-  className = '',
-  onLoad,
-  onError,
-}) => {
-  const [preview, setPreview] = useState<PeekalinkPreview | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+const LinkPreview = ({ url, preview, onLinkPreviewLoaded, onLoad, onError }: LinkPreviewProps) => {
+  const [previewData, setPreviewData] = useState<PeekalinkPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    setError(null);
-
+    let isMounted = true;
+    
     const fetchPreview = async () => {
+      if (!url && !preview) {
+        setError('未提供有效的連結或預覽數據');
+        setLoading(false);
+        onError?.(); 
+        return;
+      }
+
+      if (preview) {
+        setPreviewData(preview);
+        setLoading(false);
+        onLinkPreviewLoaded?.(preview);
+        onLoad?.(preview);
+        return;
+      }
+
       try {
-        const data = await getLinkPreview(url);
-        if (mounted && data) {
-          setPreview(data);
-          if (onLoad && data) {
-            onLoad(data);
-          }
+        const data = await getCollectLinkPreview(url);
+        if (!isMounted) return;
+        
+        if (data) {
+          const convertedData: PeekalinkPreview = {
+            id: 0,
+            ok: true,
+            url: data.url,
+            domain: data.siteName || '',
+            type: data.ogType || 'website',
+            status: 200,
+            updatedAt: new Date().toISOString(),
+            title: data.title,
+            description: data.description || undefined,
+            image: data.image ? {
+              medium: { 
+                url: data.image, 
+                width: 300, 
+                height: 200 
+              }
+            } : undefined
+          };
+          
+          setPreviewData(convertedData);
+          onLinkPreviewLoaded?.(convertedData);
+          onLoad?.(convertedData); 
+        } else {
+          setError('無法獲取連結預覽');
+          onError?.(); 
         }
-      } catch (err) {
-        if (mounted) {
-          const error = err instanceof Error ? err : new Error('Unknown error');
-          setError(error.message || '連結預覽載入失敗');
-          onError?.(error);
-        }
+      } catch (e) {
+        if (!isMounted) return;
+        setError('獲取連結預覽時出錯');
+        console.error('LinkPreview 獲取預覽出錯:', e);
+        onError?.(); 
       } finally {
-        if (mounted) {
+        if (isMounted) {
           setLoading(false);
         }
       }
     };
 
     fetchPreview();
-
+    
     return () => {
-      mounted = false;
+      isMounted = false;
     };
-  }, [url, onLoad, onError]);
+  }, [url, preview, onLinkPreviewLoaded, onLoad, onError]);
 
-  // 格式化網站域名
   const formatDomain = (domain: string) => {
     return domain?.replace(/^www\./, '') || '';
   };
 
-  // 從URL中提取域名，作為備用顯示
   const extractDomainFromUrl = (urlString: string) => {
     try {
       const url = new URL(urlString);
@@ -67,64 +98,40 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({
     }
   };
 
-  // 獲取網站圖標的JSX
-  const getFavicon = () => {
-    if (preview?.favicon) {
-      return (
-        <img 
-          src={preview.favicon} 
-          alt="網站圖標" 
-          className="w-4 h-4 mr-1 object-contain"
-          onError={(e) => {
-            // 圖標載入失敗時隱藏
-            e.currentTarget.style.display = 'none';
-          }}
-        />
-      );
-    }
-    return null;
-  };
-
   // 識別社交媒體平台並獲取預設圖標
   const getSocialMediaIcon = () => {
-    // 簡單的社交媒體平台識別邏輯
     if (url.includes('instagram.com')) return 'instagram';
     if (url.includes('facebook.com')) return 'facebook';
     if (url.includes('twitter.com') || url.includes('x.com')) return 'twitter';
-    if (url.includes('linkedin.com')) return 'linkedin';
-    if (url.includes('youtube.com')) return 'youtube';
+    if (url.includes('linkedin.com')) return 'linkedin'; 
+    if (url.includes('github.com')) return 'github';
+    if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
     if (url.includes('pinterest.com')) return 'pinterest';
     return null;
   };
 
-  // 獲取特定社交媒體的預設圖示
   const getSocialMediaDefaultImage = () => {
     const platform = getSocialMediaIcon();
     
-    // 可以根據不同平台返回不同的預設圖片URL
-    // 這裡只是簡單示例，您可以替換為實際的圖片路徑
     switch (platform) {
       case 'instagram':
-        return '/assets/social-icons/instagram.png';
+        return '/assets/images/instagram-logo.png';
       case 'facebook':
-        return '/assets/social-icons/facebook.png';
+        return '/assets/images/facebook-logo.png';
       case 'twitter':
-        return '/assets/social-icons/twitter.png';
+        return 'https://abs.twimg.com/responsive-web/web/icon-default.604e2486a34a2f6e1.png';
       case 'linkedin':
-        return '/assets/social-icons/linkedin.png';
-      case 'youtube':
-        return '/assets/social-icons/youtube.png';
-      case 'pinterest':
-        return '/assets/social-icons/pinterest.png';
+        return 'https://static.licdn.com/sc/h/2if24wp7oqlodqdlgei1n1520';
+      case 'github':
+        return 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png';
       default:
         return null;
     }
   };
 
-  // 如果正在載入中
   if (loading) {
     return (
-      <div className={`link-preview-loading rounded-lg border border-gray-200 p-4 ${className}`}>
+      <div className="link-preview-loading rounded-lg border border-gray-200 p-4">
         <div className="animate-pulse">
           <div className="h-32 bg-gray-200 rounded-md mb-2"></div>
           <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -134,15 +141,13 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({
     );
   }
 
-  // 如果加載出錯或沒有預覽數據
-  if (error || !preview) {
-    // 獲取域名作為顯示
+  if (error || !previewData) {
     const domain = extractDomainFromUrl(url);
     const socialMediaPlatform = getSocialMediaIcon();
     const defaultSocialImage = getSocialMediaDefaultImage();
     
     return (
-      <div className={`link-preview-error rounded-lg border border-gray-200 overflow-hidden ${className}`}>
+      <div className="link-preview-error rounded-lg border border-gray-200 overflow-hidden">
         <a 
           href={url} 
           target="_blank" 
@@ -182,7 +187,7 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({
   }
 
   return (
-    <div className={`link-preview rounded-lg border border-gray-200 overflow-hidden ${className}`}>
+    <div className="link-preview rounded-lg border border-gray-200 overflow-hidden">
       <a 
         href={url} 
         target="_blank" 
@@ -190,26 +195,38 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({
         className="block hover:opacity-90 transition-opacity"
       >
         <div className="flex flex-col">
-          {preview.image?.medium?.url ? (
+          {previewData.image?.medium?.url ? (
             <div 
               className="w-full bg-gray-100 relative" 
               style={{ 
-                paddingTop: '52.5%', // 16:9 比例
-                backgroundImage: `url(${preview.image.medium.url})`,
+                paddingTop: '52.5%',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat'
               }}
             >
               <img 
-                src={preview.image.medium.url} 
-                alt={preview.title || '連結預覽'} 
-                className="absolute inset-0 w-full h-full object-cover opacity-0"
+                src={previewData.image.medium.url} 
+                alt={previewData.title || '連結預覽'} 
+                className="absolute inset-0 w-full h-full object-cover"
+                onLoad={(e) => {
+                  if (previewData.image?.medium?.url) {
+                    e.currentTarget.parentElement!.style.backgroundImage = `url(${previewData.image.medium.url})`;
+                  }
+                }}
                 onError={(e) => {
-                  // 圖片加載失敗時，顯示父元素的背景
+                  console.error('預覽圖片加載失敗:', previewData.image?.medium?.url);
                   e.currentTarget.style.display = 'none';
-                  e.currentTarget.parentElement!.style.backgroundImage = 'none';
+                  e.currentTarget.parentElement!.style.height = '150px';
                   e.currentTarget.parentElement!.style.paddingTop = '0';
+                  e.currentTarget.parentElement!.innerHTML = `
+                    <div class="flex items-center justify-center h-full">
+                      <div class="text-center">
+                        <div class="text-4xl text-gray-400 mb-2">🔗</div>
+                        <p class="text-sm text-gray-500">${previewData.domain || '網站連結'}</p>
+                      </div>
+                    </div>
+                  `;
                 }}
               />
             </div>
@@ -223,18 +240,17 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({
           
           <div className="p-3">
             <h3 className="font-medium text-base text-gray-700 line-clamp-2">
-              {preview.title || url}
+              {previewData.title || url}
             </h3>
             
-            {preview.description && (
+            {previewData.description && (
               <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                {preview.description}
+                {previewData.description}
               </p>
             )}
             
             <div className="text-xs text-gray-500 mt-2 flex items-center">
-              {getFavicon()}
-              <span>{formatDomain(preview.domain)}</span>
+              <span>{formatDomain(previewData.domain)}</span>
             </div>
           </div>
         </div>
@@ -242,3 +258,5 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({
     </div>
   );
 };
+
+export default LinkPreview;
