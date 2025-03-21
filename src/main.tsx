@@ -2,9 +2,31 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { SplashScreen } from '@capacitor/splash-screen';
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { Capacitor } from '@capacitor/core';
+import ShareService from './services/ShareService';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
-// Register service worker
-if ('serviceWorker' in navigator && !window.location.host.includes('stackblitz')) {
+// 初始化 Capacitor 元件
+if (Capacitor.isNativePlatform()) {
+  // 隱藏啟動畫面
+  SplashScreen.hide();
+  
+  // 設置狀態欄
+  if (Capacitor.getPlatform() === 'ios') {
+    StatusBar.setStyle({ style: Style.Light });
+  }
+  
+  // 初始化本地通知
+  LocalNotifications.requestPermissions();
+  
+  // 確保 ShareService 實例被創建並監聽器被設置
+  ShareService;
+}
+
+// Register service worker (僅用於PWA模式)
+if ('serviceWorker' in navigator && !Capacitor.isNativePlatform() && !window.location.host.includes('stackblitz')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch((error) => {
       // Only log error in production environment

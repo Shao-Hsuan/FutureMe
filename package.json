@@ -12,6 +12,15 @@
     "generate-pwa-assets": "pwa-assets-generator"
   },
   "dependencies": {
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/cli": "^7.1.0",
+    "@capacitor/core": "^7.1.0",
+    "@capacitor/ios": "^7.1.0",
+    "@capacitor/local-notifications": "^7.0.0",
+    "@capacitor/share": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0",
+    "@capawesome/capacitor-app-update": "^7.0.1",
     "@supabase/supabase-js": "^2.39.7",
     "axios": "^1.8.3",
     "date-fns": "^3.3.1",
