@@ -222,8 +222,19 @@ export async function getCurrentSession() {
 export async function resetPasswordForEmail(email: string) {
   console.log('🔄 請求重置密碼郵件:', { email });
   try {
+    // 確定正確的重定向 URL
+    let redirectUrl: string;
+    // 檢查是否為生產環境
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // 本地開發環境
+      redirectUrl = `${window.location.origin}/reset-password`;
+    } else {
+      // 生產環境
+      redirectUrl = 'https://tiny-conkies-0b898a.netlify.app/reset-password';
+    }
+
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: redirectUrl,
     });
     
     if (error) {
