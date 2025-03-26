@@ -1,4 +1,4 @@
-import { Bold, Italic, Heading, List, CornerDownRight, Strikethrough, BookMarked, Camera, Image, Link } from 'lucide-react';
+import { Bold, Italic, Heading, List, CornerDownRight, CornerDownLeft, Strikethrough, BookMarked, Camera, Image, Link } from 'lucide-react';
 import { Editor } from '@tiptap/react';
 import { useAsyncAction } from '../../../hooks/useAsyncAction';
 import { openCamera, openMediaPicker } from '../../../services/mediaService';
@@ -64,13 +64,24 @@ export default function EditorToolbar({
     },
     {
       icon: CornerDownRight,
-      title: "縮排列點",
+      title: "增加縮排",
       isActive: false,
       onClick: () => {
         if (editor?.isActive('listItem')) {
           editor.chain().focus().sinkListItem('listItem').run();
         } else {
           editor?.chain().focus().toggleBulletList().run();
+        }
+      },
+      size: 18
+    },
+    {
+      icon: CornerDownLeft,
+      title: "減少縮排",
+      isActive: false,
+      onClick: () => {
+        if (editor?.isActive('listItem')) {
+          editor.chain().focus().liftListItem('listItem').run();
         }
       },
       size: 18
