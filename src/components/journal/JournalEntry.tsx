@@ -108,6 +108,12 @@ export default function JournalEntry({ entry, onDelete }: JournalEntryProps) {
       .join('\n');
   };
 
+  // 獲取要顯示的內容
+  const getDisplayContent = () => {
+    if (!entry.content) return '';
+    return formatContent(entry.content);
+  };
+
   return (
     <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm overflow-hidden">
       <Link to={`/journal/${entry.id}`} className="block">
@@ -161,9 +167,7 @@ export default function JournalEntry({ entry, onDelete }: JournalEntryProps) {
               <h2 className="text-xl font-bold text-gray-900">{entry.title}</h2>
             )}
             {entry.content && (
-              <p className="text-gray-600 line-clamp-3 whitespace-pre-wrap">
-                {formatContent(entry.content)}
-              </p>
+              <div className="text-gray-600 line-clamp-3 whitespace-pre-wrap overflow-hidden max-h-[4.5em] prose prose-sm" dangerouslySetInnerHTML={{ __html: getDisplayContent() }} />
             )}
           </div>
         </div>
