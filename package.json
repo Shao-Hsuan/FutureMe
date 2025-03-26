@@ -12,6 +12,10 @@
     "generate-pwa-assets": "pwa-assets-generator"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^6.4.8",
+    "@mui/material": "^6.4.8",
     "@supabase/supabase-js": "^2.39.7",
     "axios": "^1.8.3",
     "date-fns": "^3.3.1",
