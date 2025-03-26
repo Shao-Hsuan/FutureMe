@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Check, ArrowRight } from 'lucide-react';
-import JournalToolbar from '../JournalToolbar';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
 import DatePicker from '../../shared/DatePicker';
 import CollectionSelectorSheet from '../CollectionSelectorSheet';
 import Toast from '../../shared/Toast';
@@ -12,6 +14,7 @@ import { MediaFile } from '../../../types/media';
 import { JournalEntry } from '../../../types/journal';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../services/supabase';
+import EditorToolbar from './EditorToolbar';
 
 interface JournalEntryFormProps {
   initialEntry?: JournalEntry;
@@ -39,7 +42,6 @@ export default function JournalEntryForm({
 }: JournalEntryFormProps) {
   const navigate = useNavigate();
   const [title, setTitle] = useState(initialEntry?.title ?? '');
-  const [content, setContent] = useState(initialEntry?.content ?? '');
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [textCollects, setTextCollects] = useState<Array<{
     type: 'text' | 'link';
@@ -64,6 +66,20 @@ export default function JournalEntryForm({
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [selectedCollect, setSelectedCollect] = useState<any>(null);
   const [letter, setLetter] = useState<any>(null);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+
+  // TipTap 編輯器初始化
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Placeholder.configure({
+        placeholder: '內文',
+      }),
+    ],
+    content: initialEntry?.content ?? '',
+    autofocus: false,
+  });
 
   useEffect(() => {
     setError(propError);
@@ -103,8 +119,9 @@ export default function JournalEntryForm({
     }
   }, [initialEntry?.letter_id]);
 
+  // 處理儲存操作
   const handleSave = async () => {
-    if (!title && !content && mediaFiles.length === 0 && textCollects.length === 0) {
+    if (!title && (editor?.isEmpty || !editor) && mediaFiles.length === 0 && textCollects.length === 0) {
       setError('請至少填寫標題、內容或加入媒體');
       return;
     }
@@ -114,7 +131,7 @@ export default function JournalEntryForm({
       setError(undefined);
       await onSave({
         title,
-        content,
+        content: editor?.getHTML() || '', // 使用編輯器的 HTML 內容
         media_urls: mediaFiles.map(m => m.url),
         text_collects: textCollects
       });
@@ -202,6 +219,49 @@ export default function JournalEntryForm({
     setMediaFiles(prev => [...prev, ...newMediaFiles]);
   };
 
+  // 監聽鍵盤顯示/隱藏事件
+  useEffect(() => {
+    const handleFocus = () => {
+      setIsKeyboardVisible(true);
+    };
+
+    const handleBlur = () => {
+      setIsKeyboardVisible(false);
+    };
+
+    // 針對 iOS 設備，使用 visualViewport API 檢測鍵盤
+    if (window.visualViewport) {
+      const handleVisualViewportResize = () => {
+        // 如果視窗高度小於初始高度的 75%，則認為鍵盤可見
+        const isKeyboardOpen = window.visualViewport!.height < window.innerHeight * 0.75;
+        setIsKeyboardVisible(isKeyboardOpen);
+      };
+
+      window.visualViewport.addEventListener('resize', handleVisualViewportResize);
+      return () => {
+        window.visualViewport?.removeEventListener('resize', handleVisualViewportResize);
+      };
+    } else {
+      // 若不支援 visualViewport，退回至 focus/blur 事件
+      const editor = editorContainerRef.current;
+      const textarea = document.querySelector('textarea[data-component-name="JournalEntryForm"]');
+      
+      editor?.addEventListener('focus', handleFocus, true);
+      textarea?.addEventListener('focus', handleFocus);
+      
+      editor?.addEventListener('blur', handleBlur, true);
+      textarea?.addEventListener('blur', handleBlur);
+      
+      return () => {
+        editor?.removeEventListener('focus', handleFocus, true);
+        textarea?.removeEventListener('focus', handleFocus);
+        
+        editor?.removeEventListener('blur', handleBlur, true);
+        textarea?.removeEventListener('blur', handleBlur);
+      };
+    }
+  }, []);
+
   return (
     <div className="fixed inset-0 bg-white z-50 flex flex-col">
       {/* Header */}
@@ -234,7 +294,7 @@ export default function JournalEntryForm({
       )}
 
       {/* Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden pb-24">
         <div className="flex-1 overflow-y-auto">
           {/* 顯示原始信件 */}
           {letter && (
@@ -265,10 +325,10 @@ export default function JournalEntryForm({
 
           {mediaFiles.length > 0 && (
             <ImageGrid
-              items={mediaFiles.map(file => ({
-                type: file.type,
-                url: file.url,
-                content: file.url
+              items={mediaFiles.filter(f => f.type === 'image').map(f => ({
+                type: f.type,
+                url: f.url,
+                content: f.url
               }))}
               aspectRatio={2}
               gap={4}
@@ -322,35 +382,17 @@ export default function JournalEntryForm({
                 target.style.height = 'auto';
                 target.style.height = `${target.scrollHeight}px`;
               }}
-              ref={(textarea) => {
-                if (textarea) {
-                  setTimeout(() => {
-                    textarea.style.height = 'auto';
-                    textarea.style.height = `${textarea.scrollHeight}px`;
-                  }, 0);
-                }
-              }}
             />
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="開始寫作..."
-              className="w-full flex-1 focus:outline-none resize-none break-words whitespace-pre-wrap overflow-hidden"
-              style={{ minHeight: 'calc(100vh - 400px)' }}
-              onInput={(e) => {
-                const target = e.target as HTMLTextAreaElement;
-                target.style.height = 'auto';
-                target.style.height = `${target.scrollHeight}px`;
-              }}
-              ref={(textarea) => {
-                if (textarea) {
-                  setTimeout(() => {
-                    textarea.style.height = 'auto';
-                    textarea.style.height = `${textarea.scrollHeight}px`;
-                  }, 0);
-                }
-              }}
-            />
+            
+            {/* TipTap 編輯器區域 */}
+            <div 
+              ref={editorContainerRef}
+              className="min-h-[calc(100vh-400px)] prose prose-sm max-w-none border-0"
+            >
+              <EditorContent editor={editor} className="focus:outline-none min-h-[calc(100vh-400px)]" />
+            </div>
+
+            {/* 格式說明 */}
           </div>
         </div>
 
@@ -377,8 +419,9 @@ export default function JournalEntryForm({
           </div>
         )}
 
-        {/* Toolbar */}
-        <JournalToolbar
+        {/* 合併工具欄 */}
+        <EditorToolbar
+          editor={editor}
           onCollectionClick={() => setIsCollectionSelectorOpen(true)}
           onPhotoClick={(media) => handleMediaUpload(media, (progress, fileName) => {
             setUploadProgress({ progress, fileName });
@@ -439,9 +482,10 @@ export default function JournalEntryForm({
               setMediaFiles(prev => [...prev, basicLinkMedia]);
             }
           }}
+          isKeyboardVisible={isKeyboardVisible}
         />
 
-        {/* Collection Selector */}
+        {/* Collection Selector Sheet */}
         <CollectionSelectorSheet
           isOpen={isCollectionSelectorOpen}
           onClose={() => setIsCollectionSelectorOpen(false)}

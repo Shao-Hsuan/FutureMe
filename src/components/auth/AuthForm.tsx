@@ -148,6 +148,17 @@ export default function AuthForm() {
           >
             {isSignUp ? '已有帳號？登入' : '還沒有帳號？註冊'}
           </button>
+          
+          {!isSignUp && (
+            <div className="mt-2">
+              <button
+                onClick={() => navigate('/forgot-password')}
+                className="text-blue-600 hover:text-blue-800 text-sm"
+              >
+                忘記密碼？
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

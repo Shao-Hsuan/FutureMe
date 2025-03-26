@@ -218,3 +218,54 @@ export async function getCurrentSession() {
     throw error;
   }
 }
+
+export async function resetPasswordForEmail(email: string) {
+  console.log('🔄 請求重置密碼郵件:', { email });
+  try {
+    // 確定正確的重定向 URL
+    let redirectUrl: string;
+    // 檢查是否為生產環境
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // 本地開發環境
+      redirectUrl = `${window.location.origin}/reset-password`;
+    } else {
+      // 生產環境
+      redirectUrl = 'https://tiny-conkies-0b898a.netlify.app/reset-password';
+    }
+
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl,
+    });
+    
+    if (error) {
+      console.error('❌ 重置密碼郵件發送失敗:', error);
+      throw error;
+    }
+    
+    console.log('✅ 重置密碼郵件發送成功');
+    return data;
+  } catch (error) {
+    console.error('❌ 重置密碼請求錯誤:', error);
+    throw error;
+  }
+}
+
+export async function updateUserPassword(newPassword: string) {
+  console.log('🔐 嘗試更新用戶密碼');
+  try {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+    
+    if (error) {
+      console.error('❌ 密碼更新失敗:', error);
+      throw error;
+    }
+    
+    console.log('✅ 密碼更新成功');
+    return data;
+  } catch (error) {
+    console.error('❌ 密碼更新錯誤:', error);
+    throw error;
+  }
+}
