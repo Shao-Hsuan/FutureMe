@@ -218,3 +218,43 @@ export async function getCurrentSession() {
     throw error;
   }
 }
+
+export async function resetPasswordForEmail(email: string) {
+  console.log('🔄 請求重置密碼郵件:', { email });
+  try {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    
+    if (error) {
+      console.error('❌ 重置密碼郵件發送失敗:', error);
+      throw error;
+    }
+    
+    console.log('✅ 重置密碼郵件發送成功');
+    return data;
+  } catch (error) {
+    console.error('❌ 重置密碼請求錯誤:', error);
+    throw error;
+  }
+}
+
+export async function updateUserPassword(newPassword: string) {
+  console.log('🔐 嘗試更新用戶密碼');
+  try {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+    
+    if (error) {
+      console.error('❌ 密碼更新失敗:', error);
+      throw error;
+    }
+    
+    console.log('✅ 密碼更新成功');
+    return data;
+  } catch (error) {
+    console.error('❌ 密碼更新錯誤:', error);
+    throw error;
+  }
+}

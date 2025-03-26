@@ -15,6 +15,8 @@ import AuthForm from './components/auth/AuthForm';
 import AuthRequired from './components/auth/AuthRequired';
 import UsageGuideSheet from './components/settings/UsageGuideSheet';
 import GlobalLoading from './components/shared/GlobalLoading';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import { supabase } from './services/supabase';
 import { LinkPreviewExample } from './examples/LinkPreviewExample';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -65,6 +67,8 @@ function App() {
         <Routes>
           {/* Public routes */}
           <Route path="/auth" element={<AuthForm />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           
           {/* Protected routes */}
           <Route element={<AuthRequired onFirstLogin={() => setShowGuide(true)} />}>
