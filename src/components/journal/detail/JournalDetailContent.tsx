@@ -111,6 +111,31 @@ export default function JournalDetailContent({ entry }: JournalDetailContentProp
     }
   };
 
+  // 檢查內容是否為 HTML
+  const isHtml = (str: string) => {
+    return /<\/?[a-z][\s\S]*>/i.test(str);
+  };
+
+  // 處理內容顯示
+  const renderContent = () => {
+    if (!entry.content) return null;
+    
+    if (isHtml(entry.content)) {
+      return (
+        <div 
+          className="text-gray-800 prose prose-sm max-w-none" 
+          dangerouslySetInnerHTML={{ __html: entry.content }}
+        />
+      );
+    }
+    
+    return (
+      <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">
+        {entry.content}
+      </p>
+    );
+  };
+
   return (
     <article className="p-4 space-y-4">
       {/* 顯示原始信件 */}
@@ -159,9 +184,7 @@ export default function JournalDetailContent({ entry }: JournalDetailContentProp
         <time className="block text-sm text-gray-500">
           {formatDate(new Date(entry.created_at), 'PPP')}
         </time>
-        <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">
-          {entry.content}
-        </p>
+        {renderContent()}
       </div>
 
       {/* Image Gallery */}
