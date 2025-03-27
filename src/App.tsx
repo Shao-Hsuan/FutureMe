@@ -11,6 +11,7 @@ import FutureMePage from './pages/FutureMePage';
 import LetterDetailPage from './pages/LetterDetailPage';
 import GoalSetupPage from './pages/GoalSetupPage';
 import WelcomePage from './pages/WelcomePage';
+import OnboardingPage from './pages/OnboardingPage';
 import AuthForm from './components/auth/AuthForm';
 import AuthRequired from './components/auth/AuthRequired';
 import UsageGuideSheet from './components/settings/UsageGuideSheet';
@@ -65,6 +66,9 @@ function App() {
     <ErrorBoundary>
       <Router>
         <Routes>
+          {/* Onboarding route */}
+          <Route path="/onboarding" element={<OnboardingPage />} />
+          
           {/* Public routes */}
           <Route path="/auth" element={<AuthForm />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -83,7 +87,7 @@ function App() {
                 <TabBar />
               </div>
             }>
-              <Route path="/" element={<Navigate to="/journal" replace />} />
+              <Route path="/" element={<Navigate to="/onboarding" replace />} />
               <Route path="/journal" element={<JournalPage />} />
               <Route path="/journal/new" element={<JournalNewPage />} />
               <Route path="/collection" element={<CollectionPage />} />

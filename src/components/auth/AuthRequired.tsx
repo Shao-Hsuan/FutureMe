@@ -6,7 +6,7 @@ import { useGoalStore } from '../../store/goalStore';
 import { AuthStatus } from '../../services/auth';
 
 // 定義公開路由
-const PUBLIC_ROUTES = ['/auth'];
+const PUBLIC_ROUTES = ['/auth', '/onboarding'];
 
 interface AuthRequiredProps {
   onFirstLogin: () => void;
@@ -211,13 +211,13 @@ export default function AuthRequired({ onFirstLogin }: AuthRequiredProps) {
     };
   }, []);
 
-  // 如果是登出事件，直接導向到登入頁面
+  // 如果是登出事件，直接導向到onboarding頁面
   if (status === AuthStatus.UNAUTHENTICATED && !PUBLIC_ROUTES.includes(location.pathname)) {
-    console.log('🚫 User not authenticated, redirecting to auth');
-    return <Navigate to="/auth" replace />;
+    console.log('🚫 User not authenticated, redirecting to onboarding');
+    return <Navigate to="/onboarding" replace />;
   }
 
-  // 處理已登入狀態訪問登入頁面
+  // 處理已登入狀態訪問登入頁面或onboarding頁面
   if (status === AuthStatus.AUTHENTICATED && PUBLIC_ROUTES.includes(location.pathname)) {
     console.log('👤 User authenticated, checking for goals before redirecting');
     
