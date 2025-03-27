@@ -100,11 +100,11 @@ const OnboardingPage = () => {
             </div>
 
             <div className="absolute top-[45%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-10" style={{ width: '80%', maxWidth: '500px' }}>
-              <h1 className="text-3xl font-light text-gray-900 mb-1">
+              <h1 className="text-2xl font-light text-gray-900 mb-1">
                 我想要
               </h1>
               <div className="min-h-[30px]">
-                <h1 className="text-3xl font-bold text-gray-900">
+                <h1 className="text-2xl font-bold text-gray-900">
                   {typedText}
                 </h1>
               </div>
@@ -130,7 +130,7 @@ const OnboardingPage = () => {
                 </div>
               </div>
             </div>
-            <h2 className="text-lg font-medium text-center mb-2">收集一切你很歡的資訊</h2>
+            <h2 className="text-lg font-medium text-center mb-2">收集一切你喜歡的資訊</h2>
             <p className="text-base text-center">並從中獲得靈感</p>
           </div>
         );
@@ -146,7 +146,7 @@ const OnboardingPage = () => {
                 <div className="bg-gray-200 rounded-2xl w-4/5 h-1/4"></div>
               </div>
             </div>
-            <h2 className="text-lg font-medium text-center mb-2">記錄那些難忘時間</h2>
+            <h2 className="text-lg font-medium text-center mb-2">記錄過程中的每個酸甜苦辣</h2>
           </div>
         );
 
