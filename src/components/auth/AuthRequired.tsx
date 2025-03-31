@@ -221,15 +221,31 @@ export default function AuthRequired({ onFirstLogin }: AuthRequiredProps) {
   if (status === AuthStatus.AUTHENTICATED && PUBLIC_ROUTES.includes(location.pathname)) {
     console.log('👤 User authenticated, checking for goals before redirecting');
     
-    // 優先檢查目標狀態，如果沒有目標且目標載入完成，導向到目標設置頁面
-    if (goals.length === 0 && goalsLoaded) {
-      console.log('🎯 No goals found, redirecting to goal setup');
-      return <Navigate to="/goal-setup" replace />;
+    // 已登入用戶訪問 onboarding 頁面時，重定向到適當頁面
+    if (location.pathname === '/onboarding') {
+      // 優先檢查目標狀態，如果沒有目標且目標載入完成，導向到目標設置頁面
+      if (goals.length === 0 && goalsLoaded) {
+        console.log('🎯 No goals found, redirecting to goal setup');
+        return <Navigate to="/goal-setup" replace />;
+      }
+      
+      // 有目標時導向到日誌頁面
+      console.log('👤 User has goals, redirecting to journal');
+      return <Navigate to="/journal" replace />;
     }
     
-    // 有目標時才導向到日誌頁面
-    console.log('👤 User has goals, redirecting to journal');
-    return <Navigate to="/journal" replace />;
+    // 處理其他公開頁面的訪問
+    if (location.pathname === '/auth') {
+      // 優先檢查目標狀態，如果沒有目標且目標載入完成，導向到目標設置頁面
+      if (goals.length === 0 && goalsLoaded) {
+        console.log('🎯 No goals found, redirecting to goal setup');
+        return <Navigate to="/goal-setup" replace />;
+      }
+      
+      // 有目標時導向到日誌頁面
+      console.log('👤 User has goals, redirecting to journal');
+      return <Navigate to="/journal" replace />;
+    }
   }
 
   // 處理初始化狀態
