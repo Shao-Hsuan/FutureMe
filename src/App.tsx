@@ -87,7 +87,7 @@ function App() {
                 <TabBar />
               </div>
             }>
-              <Route path="/" element={<Navigate to="/onboarding" replace />} />
+              <Route path="/" element={<Navigate to="/journal" replace />} />
               <Route path="/journal" element={<JournalPage />} />
               <Route path="/journal/new" element={<JournalNewPage />} />
               <Route path="/collection" element={<CollectionPage />} />
